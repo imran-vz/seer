@@ -10,7 +10,7 @@
 /* Font Faces */
 @font-face {
 	font-family: "Google Sans Code";
-	src: url("../public/fonts/Google_Sans_Code/GoogleSansCode-VariableFont_wght.ttf")
+	src: url("./fonts/Google_Sans_Code/GoogleSansCode-VariableFont_wght.ttf")
 		format("truetype");
 	font-weight: 100 900;
 	font-style: normal;
@@ -19,7 +19,7 @@
 
 @font-face {
 	font-family: "Google Sans Code";
-	src: url("../public/fonts/Google_Sans_Code/GoogleSansCode-Italic-VariableFont_wght.ttf")
+	src: url("./fonts/Google_Sans_Code/GoogleSansCode-Italic-VariableFont_wght.ttf")
 		format("truetype");
 	font-weight: 100 900;
 	font-style: italic;
