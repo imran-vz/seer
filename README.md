@@ -1,5 +1,7 @@
 # Seer
 
+> **⚠️ Work In Progress** - This project is under active development. Features may be incomplete or subject to change.
+
 A desktop application for media file management, metadata editing, codec detection, and re-encoding.
 
 **Seer** (Tamil: சீர்) - to prune, order, uniformity, neatness.
