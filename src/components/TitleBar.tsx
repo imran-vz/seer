@@ -27,7 +27,18 @@ export function TitleBar() {
 			role="button"
 		>
 			<div className="grid grid-cols-2 place-items-center gap-0">
-				<img data-no-drag src="/seer.svg" className="w-6 h-6" alt="Seer" />
+				<img
+					data-no-drag
+					src="/seer.svg"
+					className="w-6 h-6 dark:hidden"
+					alt="Seer"
+				/>
+				<img
+					data-no-drag
+					src="/seer-dark.svg"
+					className="w-6 h-6 hidden dark:block"
+					alt="Seer"
+				/>
 				<h1 className="text-base font-semibold flex-1 leading-0">Seer</h1>
 			</div>
 			<div data-no-drag>
