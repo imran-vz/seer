@@ -19,28 +19,29 @@ export function TitleBar() {
 	};
 
 	return (
-		// biome-ignore lint/a11y/useSemanticElements: this is to support drags and window matching
+		// biome-ignore lint/a11y/noStaticElementInteractions: required for window dragging
 		<header
-			className="flex justify-between items-center gap-3 pl-20 pr-4 py-2 border-b border-border bg-card select-none w-full h-14"
+			className="titlebar-drag-region flex h-12 select-none items-center border-border/50 border-b bg-muted/40 pr-3 pl-23"
 			onMouseDown={handleMouseDown}
 			onDoubleClick={handleDoubleClick}
-			role="button"
 		>
-			<div className="grid grid-cols-2 place-items-center gap-0">
+			{/* App Icon - inline with traffic lights (y=24) with 1rem margin */}
+			<div
+				data-no-drag
+				className="flex h-8 w-8 items-center justify-center rounded-lg border border-border/50 bg-background shadow-sm"
+			>
+				<img src="/seer.svg" className="h-4 w-4 dark:hidden" alt="Seer" />
 				<img
-					data-no-drag
-					src="/seer.svg"
-					className="w-6 h-6 dark:hidden"
-					alt="Seer"
-				/>
-				<img
-					data-no-drag
 					src="/seer-dark.svg"
-					className="w-6 h-6 hidden dark:block"
+					className="hidden h-4 w-4 dark:block"
 					alt="Seer"
 				/>
-				<h1 className="text-base font-semibold flex-1 leading-0">Seer</h1>
 			</div>
+
+			{/* Spacer */}
+			<div className="flex-1" />
+
+			{/* Right side controls */}
 			<div data-no-drag>
 				<ThemeSwitcher />
 			</div>

@@ -1,71 +1,99 @@
-import { invoke } from "@tauri-apps/api/core";
-import { ChevronLeft, FileText, Film, Folder } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import {
+	ChevronLeft,
+	Copy,
+	CopyIcon,
+	FileText,
+	Film,
+	Folder,
+	FolderOpen,
+	FolderPlus,
+	Move,
+	Pencil,
+	RefreshCw,
+	Trash,
+	Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+	ContextMenu,
+	ContextMenuContent,
+	ContextMenuItem,
+	ContextMenuSeparator,
+	ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { type FileEntry, useFileBrowserStore } from "@/stores/fileBrowserStore";
 
-interface FileEntry {
-	name: string;
-	path: string;
-	is_dir: boolean;
-	is_media: boolean;
-	size: number;
-	modified: string | null;
-}
+type DialogType =
+	| "rename"
+	| "newFolder"
+	| "move"
+	| "copy"
+	| "bulkMove"
+	| "bulkCopy"
+	| null;
 
-interface FileBrowserProps {
-	onFileSelect: (path: string) => void;
-}
+export function FileBrowser() {
+	const {
+		currentPath,
+		files,
+		selectedPath,
+		selectedPaths,
+		error,
+		loading,
+		initialize,
+		refresh,
+		goUp,
+		navigate,
+		selectFile,
+		renameFile,
+		deleteFile,
+		moveFile,
+		copyFile,
+		createFolder,
+		revealInFolder,
+		toggleSelection,
+		selectAll,
+		clearSelection,
+		deleteSelected,
+		moveSelected,
+		copySelected,
+	} = useFileBrowserStore();
 
-export function FileBrowser({ onFileSelect }: FileBrowserProps) {
-	const [currentPath, setCurrentPath] = useState<string>("");
-	const [files, setFiles] = useState<FileEntry[]>([]);
-	const [error, setError] = useState<string | null>(null);
-	const [selectedPath, setSelectedPath] = useState<string | null>(null);
-
-	const loadDirectory = useCallback(async (path: string) => {
-		try {
-			setError(null);
-			const entries = await invoke<FileEntry[]>("list_directory", { path });
-			setFiles(entries);
-		} catch (e) {
-			setError(String(e));
-		}
-	}, []);
+	const [dialogType, setDialogType] = useState<DialogType>(null);
+	const [dialogInput, setDialogInput] = useState("");
+	const [targetFile, setTargetFile] = useState<FileEntry | null>(null);
+	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+	const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+	const [operationError, setOperationError] = useState<string | null>(null);
 
 	useEffect(() => {
-		invoke<string>("get_home_dir").then((home) => {
-			setCurrentPath(home);
-			loadDirectory(home);
-		});
-	}, [loadDirectory]);
-
-	const handleNavigate = (entry: FileEntry) => {
-		if (entry.is_dir) {
-			setCurrentPath(entry.path);
-			loadDirectory(entry.path);
-			setSelectedPath(null);
-		}
-	};
-
-	const handleSelect = (entry: FileEntry) => {
-		if (entry.is_dir) {
-			return;
-		}
-		if (!entry.is_media) {
-			return;
-		}
-		setSelectedPath(entry.path);
-		onFileSelect(entry.path);
-	};
-
-	const handleGoUp = () => {
-		const parent = currentPath.split("/").slice(0, -1).join("/") || "/";
-		setCurrentPath(parent);
-		loadDirectory(parent);
-		setSelectedPath(null);
-	};
+		initialize();
+	}, [initialize]);
 
 	const formatSize = (bytes: number): string => {
 		if (bytes === 0) return "-";
@@ -74,64 +102,549 @@ export function FileBrowser({ onFileSelect }: FileBrowserProps) {
 		return `${(bytes / 1024 ** i).toFixed(1)} ${units[i]}`;
 	};
 
+	const hasSelection = selectedPaths.size > 0;
+	const allSelected = files.length > 0 && selectedPaths.size === files.length;
+
+	const openRenameDialog = (file: FileEntry) => {
+		setTargetFile(file);
+		setDialogInput(file.name);
+		setDialogType("rename");
+		setOperationError(null);
+	};
+
+	const openDeleteDialog = (file: FileEntry) => {
+		setTargetFile(file);
+		setDeleteDialogOpen(true);
+		setOperationError(null);
+	};
+
+	const openNewFolderDialog = () => {
+		setDialogInput("");
+		setDialogType("newFolder");
+		setOperationError(null);
+	};
+
+	const openMoveDialog = (file: FileEntry) => {
+		setTargetFile(file);
+		setDialogInput(currentPath);
+		setDialogType("move");
+		setOperationError(null);
+	};
+
+	const openCopyDialog = (file: FileEntry) => {
+		setTargetFile(file);
+		setDialogInput(currentPath);
+		setDialogType("copy");
+		setOperationError(null);
+	};
+
+	const openBulkMoveDialog = () => {
+		setDialogInput(currentPath);
+		setDialogType("bulkMove");
+		setOperationError(null);
+	};
+
+	const openBulkCopyDialog = () => {
+		setDialogInput(currentPath);
+		setDialogType("bulkCopy");
+		setOperationError(null);
+	};
+
+	const openBulkDeleteDialog = () => {
+		setBulkDeleteDialogOpen(true);
+		setOperationError(null);
+	};
+
+	const closeDialog = () => {
+		setDialogType(null);
+		setDialogInput("");
+		setTargetFile(null);
+		setOperationError(null);
+	};
+
+	const handleRename = async () => {
+		if (!targetFile || !dialogInput.trim()) return;
+		try {
+			await renameFile(targetFile.path, dialogInput.trim());
+			closeDialog();
+		} catch (e) {
+			setOperationError(String(e));
+		}
+	};
+
+	const handleDelete = async (permanent: boolean) => {
+		if (!targetFile) return;
+		try {
+			await deleteFile(targetFile.path, permanent);
+			setDeleteDialogOpen(false);
+			setTargetFile(null);
+		} catch (e) {
+			setOperationError(String(e));
+		}
+	};
+
+	const handleBulkDelete = async (permanent: boolean) => {
+		try {
+			await deleteSelected(permanent);
+			setBulkDeleteDialogOpen(false);
+		} catch (e) {
+			setOperationError(String(e));
+		}
+	};
+
+	const handleNewFolder = async () => {
+		if (!dialogInput.trim()) return;
+		try {
+			await createFolder(dialogInput.trim());
+			closeDialog();
+		} catch (e) {
+			setOperationError(String(e));
+		}
+	};
+
+	const handleMove = async () => {
+		if (!targetFile || !dialogInput.trim()) return;
+		try {
+			await moveFile(targetFile.path, dialogInput.trim());
+			closeDialog();
+		} catch (e) {
+			setOperationError(String(e));
+		}
+	};
+
+	const handleCopy = async () => {
+		if (!targetFile || !dialogInput.trim()) return;
+		try {
+			await copyFile(targetFile.path, dialogInput.trim());
+			closeDialog();
+		} catch (e) {
+			setOperationError(String(e));
+		}
+	};
+
+	const handleBulkMove = async () => {
+		if (!dialogInput.trim()) return;
+		try {
+			await moveSelected(dialogInput.trim());
+			closeDialog();
+		} catch (e) {
+			setOperationError(String(e));
+		}
+	};
+
+	const handleBulkCopy = async () => {
+		if (!dialogInput.trim()) return;
+		try {
+			await copySelected(dialogInput.trim());
+			closeDialog();
+		} catch (e) {
+			setOperationError(String(e));
+		}
+	};
+
+	const handleReveal = async (file: FileEntry) => {
+		try {
+			await revealInFolder(file.path);
+		} catch (e) {
+			console.error("Failed to reveal:", e);
+		}
+	};
+
+	const handleDialogSubmit = () => {
+		switch (dialogType) {
+			case "rename":
+				handleRename();
+				break;
+			case "newFolder":
+				handleNewFolder();
+				break;
+			case "move":
+				handleMove();
+				break;
+			case "copy":
+				handleCopy();
+				break;
+			case "bulkMove":
+				handleBulkMove();
+				break;
+			case "bulkCopy":
+				handleBulkCopy();
+				break;
+		}
+	};
+
+	const getDialogTitle = () => {
+		switch (dialogType) {
+			case "rename":
+				return "Rename";
+			case "newFolder":
+				return "New Folder";
+			case "move":
+				return "Move To";
+			case "copy":
+				return "Copy To";
+			case "bulkMove":
+				return `Move ${selectedPaths.size} Items`;
+			case "bulkCopy":
+				return `Copy ${selectedPaths.size} Items`;
+			default:
+				return "";
+		}
+	};
+
+	const getDialogDescription = () => {
+		switch (dialogType) {
+			case "rename":
+				return `Enter a new name for "${targetFile?.name}"`;
+			case "newFolder":
+				return "Enter a name for the new folder";
+			case "move":
+				return `Enter destination path to move "${targetFile?.name}"`;
+			case "copy":
+				return `Enter destination path to copy "${targetFile?.name}"`;
+			case "bulkMove":
+				return `Enter destination path to move ${selectedPaths.size} selected items`;
+			case "bulkCopy":
+				return `Enter destination path to copy ${selectedPaths.size} selected items`;
+			default:
+				return "";
+		}
+	};
+
+	const getDialogButtonText = () => {
+		switch (dialogType) {
+			case "rename":
+				return "Rename";
+			case "newFolder":
+				return "Create";
+			case "move":
+			case "bulkMove":
+				return "Move";
+			case "copy":
+			case "bulkCopy":
+				return "Copy";
+			default:
+				return "OK";
+		}
+	};
+
+	const handleSelectAllToggle = () => {
+		if (allSelected) {
+			clearSelection();
+		} else {
+			selectAll();
+		}
+	};
+
+	const copyPath = async (path: string) => {
+		await writeText(path);
+		toast.success("Path copied to clipboard");
+	};
+
 	return (
-		<div className="flex flex-col h-full border-r border-border">
-			<div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-card">
+		<div className="flex h-full flex-col">
+			{/* Navigation Bar */}
+			<div className="flex items-center gap-1 border-border/50 border-b bg-muted/40 px-2 py-1.5">
 				<Button
 					variant="ghost"
-					size="icon"
-					onClick={handleGoUp}
+					size="icon-sm"
+					onClick={goUp}
 					disabled={currentPath === "/"}
+					className="h-7 w-7"
 				>
-					<ChevronLeft className="h-4 w-4" />
+					<ChevronLeft className="size-4" />
 				</Button>
-				<span className="text-xs text-muted-foreground truncate flex-1">
-					{currentPath}
-				</span>
+				<div className="flex min-w-0 flex-1 items-center rounded-md px-2 py-1">
+					<span className="truncate text-xs">{currentPath}</span>{" "}
+					<button onClick={() => copyPath(currentPath)} type="button">
+						<CopyIcon className="ml-2 size-4" />
+					</button>
+				</div>
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					onClick={openNewFolderDialog}
+					title="New Folder"
+					className="h-7 w-7"
+				>
+					<FolderPlus className="h-3.5 w-3.5" />
+				</Button>
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					onClick={refresh}
+					disabled={loading}
+					title="Refresh"
+					className="h-7 w-7"
+				>
+					<RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
+				</Button>
 			</div>
 
+			{/* Bulk Actions Bar */}
+			{hasSelection && (
+				<div className="flex items-center gap-1.5 border-border border-b bg-primary/5 px-2 py-1.5">
+					<span className="px-1 font-medium text-primary text-xs">
+						{selectedPaths.size} selected
+					</span>
+					<div className="flex-1" />
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={openBulkMoveDialog}
+						className="h-7 text-xs"
+					>
+						<Move className="mr-1 h-3.5 w-3.5" />
+						Move
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={openBulkCopyDialog}
+						className="h-7 text-xs"
+					>
+						<Copy className="mr-1 h-3.5 w-3.5" />
+						Copy
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={openBulkDeleteDialog}
+						className="h-7 text-destructive text-xs hover:text-destructive"
+					>
+						<Trash className="mr-1 h-3.5 w-3.5" />
+						Delete
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={clearSelection}
+						className="h-7 text-xs"
+					>
+						Clear
+					</Button>
+				</div>
+			)}
+
 			{error && (
-				<div className="px-3 py-2 bg-destructive/10 text-destructive text-xs">
+				<div className="bg-destructive/10 px-3 py-2 text-destructive text-xs">
 					{error}
 				</div>
 			)}
 
-			<ScrollArea className="flex-1 h-[calc(100%-4rem)]">
-				<div className="p-1">
+			{/* Column Headers */}
+			<div className="grid grid-cols-[24px_20px_1fr_70px_130px] items-center gap-2 border-border/50 border-b px-3 py-1 font-medium text-[11px] text-muted-foreground uppercase tracking-wider">
+				<div className="flex items-center justify-center">
+					<Checkbox
+						checked={allSelected}
+						onCheckedChange={handleSelectAllToggle}
+						aria-label="Select all"
+						className="h-3.5 w-3.5"
+					/>
+				</div>
+				<span />
+				<span>Name</span>
+				<span className="text-right">Size</span>
+				<span className="text-right">Modified</span>
+			</div>
+
+			<ScrollArea className="flex-1">
+				<div className="px-1 py-0.5">
 					{files.map((file) => (
-						<button
-							type="button"
-							key={file.path}
-							className={cn(
-								"grid w-full grid-cols-[20px_1fr_70px_130px] gap-2 items-center px-2 py-1.5 rounded-md cursor-pointer text-sm transition-colors",
-								"hover:bg-accent",
-								selectedPath === file.path && "bg-accent",
-								!file.is_dir && !file.is_media && "opacity-40 hover:opacity-60",
-								file.is_dir && "font-medium",
-							)}
-							onClick={() => handleSelect(file)}
-							onDoubleClick={() => handleNavigate(file)}
-						>
-							<span className="text-muted-foreground">
-								{file.is_dir ? (
-									<Folder className="h-4 w-4" />
-								) : file.is_media ? (
-									<Film className="h-4 w-4" />
-								) : (
-									<FileText className="h-4 w-4" />
+						<ContextMenu key={file.path}>
+							<ContextMenuTrigger asChild>
+								<button
+									type="button"
+									className={cn(
+										"grid w-full cursor-pointer grid-cols-[24px_20px_1fr_70px_130px] items-center gap-2 rounded px-3 py-1 text-[13px] transition-colors",
+										"hover:bg-accent/50",
+										selectedPath === file.path && "bg-accent",
+										selectedPaths.has(file.path) &&
+											"bg-primary/10 hover:bg-primary/15",
+										!file.is_dir &&
+											!file.is_media &&
+											"opacity-40 hover:opacity-60",
+										file.is_dir && "font-medium",
+									)}
+									onClick={() => selectFile(file)}
+									onDoubleClick={() => navigate(file)}
+								>
+									<span className="flex items-center justify-center">
+										<Checkbox
+											checked={selectedPaths.has(file.path)}
+											onCheckedChange={() => toggleSelection(file.path)}
+											onClick={(e) => e.stopPropagation()}
+											aria-label={`Select ${file.name}`}
+											className="h-3.5 w-3.5"
+										/>
+									</span>
+									<span className="text-muted-foreground/70">
+										{file.is_dir ? (
+											<Folder className="size-4 text-blue-500/80" />
+										) : file.is_media ? (
+											<Film className="size-4 text-purple-500/80" />
+										) : (
+											<FileText className="size-4" />
+										)}
+									</span>
+									<span className="truncate text-left">{file.name}</span>
+									<span className="text-right text-[11px] text-muted-foreground/70 tabular-nums">
+										{file.is_dir ? "—" : formatSize(file.size)}
+									</span>
+									<span className="text-right text-[11px] text-muted-foreground/70">
+										{file.modified || "—"}
+									</span>
+								</button>
+							</ContextMenuTrigger>
+							<ContextMenuContent className="w-48">
+								{file.is_dir && (
+									<>
+										<ContextMenuItem onClick={() => navigate(file)}>
+											<FolderOpen className="mr-2 size-4" />
+											Open
+										</ContextMenuItem>
+										<ContextMenuSeparator />
+									</>
 								)}
-							</span>
-							<span className="truncate text-left">{file.name}</span>
-							<span className="text-xs text-muted-foreground text-right">
-								{file.is_dir ? "-" : formatSize(file.size)}
-							</span>
-							<span className="text-xs text-muted-foreground text-right">
-								{file.modified || "-"}
-							</span>
-						</button>
+								<ContextMenuItem onClick={() => openRenameDialog(file)}>
+									<Pencil className="mr-2 size-4" />
+									Rename
+								</ContextMenuItem>
+								<ContextMenuItem onClick={() => openMoveDialog(file)}>
+									<Move className="mr-2 size-4" />
+									Move To...
+								</ContextMenuItem>
+								<ContextMenuItem onClick={() => openCopyDialog(file)}>
+									<Copy className="mr-2 size-4" />
+									Copy To...
+								</ContextMenuItem>
+								<ContextMenuSeparator />
+								<ContextMenuItem onClick={() => handleReveal(file)}>
+									<FolderOpen className="mr-2 size-4" />
+									Reveal in Finder
+								</ContextMenuItem>
+								<ContextMenuSeparator />
+								<ContextMenuItem
+									onClick={() => openDeleteDialog(file)}
+									className="text-destructive focus:text-destructive"
+								>
+									<Trash className="mr-2 size-4" />
+									Delete
+								</ContextMenuItem>
+							</ContextMenuContent>
+						</ContextMenu>
 					))}
 				</div>
 			</ScrollArea>
+
+			{/* Rename / New Folder / Move / Copy Dialog */}
+			<Dialog open={dialogType !== null} onOpenChange={() => closeDialog()}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>{getDialogTitle()}</DialogTitle>
+						<DialogDescription>{getDialogDescription()}</DialogDescription>
+					</DialogHeader>
+					<div className="py-4">
+						<Input
+							value={dialogInput}
+							onChange={(e) => setDialogInput(e.target.value)}
+							placeholder={
+								dialogType === "rename" || dialogType === "newFolder"
+									? "Name"
+									: "Path"
+							}
+							onKeyDown={(e) => {
+								if (e.key === "Enter") {
+									handleDialogSubmit();
+								}
+							}}
+						/>
+						{operationError && (
+							<p className="mt-2 text-destructive text-sm">{operationError}</p>
+						)}
+					</div>
+					<DialogFooter>
+						<Button variant="outline" onClick={closeDialog}>
+							Cancel
+						</Button>
+						<Button onClick={handleDialogSubmit}>
+							{getDialogButtonText()}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Single Delete Confirmation Dialog */}
+			<AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Delete "{targetFile?.name}"?</AlertDialogTitle>
+						<AlertDialogDescription>
+							Choose how you want to delete this{" "}
+							{targetFile?.is_dir ? "folder" : "file"}. Moving to trash allows
+							recovery, while permanent deletion cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					{operationError && (
+						<p className="text-destructive text-sm">{operationError}</p>
+					)}
+					<AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={() => handleDelete(false)}
+							className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
+						>
+							<Trash className="mr-2 size-4" />
+							Move to Trash
+						</AlertDialogAction>
+						<AlertDialogAction
+							onClick={() => handleDelete(true)}
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+						>
+							<Trash2 className="mr-2 size-4" />
+							Delete Permanently
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
+
+			{/* Bulk Delete Confirmation Dialog */}
+			<AlertDialog
+				open={bulkDeleteDialogOpen}
+				onOpenChange={setBulkDeleteDialogOpen}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>
+							Delete {selectedPaths.size} items?
+						</AlertDialogTitle>
+						<AlertDialogDescription>
+							Choose how you want to delete these items. Moving to trash allows
+							recovery, while permanent deletion cannot be undone.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					{operationError && (
+						<p className="text-destructive text-sm">{operationError}</p>
+					)}
+					<AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+						<AlertDialogCancel>Cancel</AlertDialogCancel>
+						<AlertDialogAction
+							onClick={() => handleBulkDelete(false)}
+							className="bg-secondary text-secondary-foreground hover:bg-secondary/80"
+						>
+							<Trash className="mr-2 size-4" />
+							Move to Trash
+						</AlertDialogAction>
+						<AlertDialogAction
+							onClick={() => handleBulkDelete(true)}
+							className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+						>
+							<Trash2 className="mr-2 size-4" />
+							Delete Permanently
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</div>
 	);
 }

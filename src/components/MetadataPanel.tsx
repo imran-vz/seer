@@ -53,8 +53,8 @@ function MetadataSection({
 	children: React.ReactNode;
 }) {
 	return (
-		<div className="mb-4 p-3 bg-card rounded-lg border border-border">
-			<h3 className="text-xs font-semibold uppercase tracking-wider text-primary mb-3">
+		<div className="mb-4 rounded-lg border border-border bg-card p-3">
+			<h3 className="mb-3 font-semibold text-primary text-xs uppercase tracking-wider">
 				{title}
 			</h3>
 			<div className="grid grid-cols-[minmax(100px,auto)_1fr] gap-x-4 gap-y-2 text-sm">
@@ -73,8 +73,8 @@ function MetadataRow({
 }) {
 	return (
 		<>
-			<span className="text-muted-foreground whitespace-nowrap">{label}</span>
-			<span className="text-foreground wrap-break-word min-w-0">{value}</span>
+			<span className="whitespace-nowrap text-muted-foreground">{label}</span>
+			<span className="wrap-break-word min-w-0 text-foreground">{value}</span>
 		</>
 	);
 }
@@ -137,7 +137,7 @@ export function MetadataPanel({ filePath }: MetadataPanelProps) {
 
 	if (!filePath) {
 		return (
-			<div className="flex items-center justify-center h-full text-muted-foreground">
+			<div className="flex h-full items-center justify-center text-muted-foreground">
 				<p>Select a file to view metadata</p>
 			</div>
 		);
@@ -145,7 +145,7 @@ export function MetadataPanel({ filePath }: MetadataPanelProps) {
 
 	if (loading) {
 		return (
-			<div className="flex items-center justify-center h-full text-muted-foreground">
+			<div className="flex h-full items-center justify-center text-muted-foreground">
 				<p>Loading metadata...</p>
 			</div>
 		);
@@ -153,7 +153,7 @@ export function MetadataPanel({ filePath }: MetadataPanelProps) {
 
 	if (error) {
 		return (
-			<div className="flex items-center justify-center h-full text-destructive">
+			<div className="flex h-full items-center justify-center text-destructive">
 				<p>Error: {error}</p>
 			</div>
 		);
@@ -164,7 +164,7 @@ export function MetadataPanel({ filePath }: MetadataPanelProps) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-4">
-				<h2 className="text-lg font-semibold mb-4 break-all">
+				<h2 className="mb-4 break-all font-semibold text-lg">
 					{metadata.name}
 				</h2>
 

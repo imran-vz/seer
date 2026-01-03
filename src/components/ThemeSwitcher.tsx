@@ -11,9 +11,9 @@ import {
 type Theme = "system" | "light" | "dark";
 
 const themes: { value: Theme; label: string; icon: React.ReactNode }[] = [
-	{ value: "system", label: "System", icon: <Monitor className="w-4 h-4" /> },
-	{ value: "light", label: "Light", icon: <Sun className="w-4 h-4" /> },
-	{ value: "dark", label: "Dark", icon: <Moon className="w-4 h-4" /> },
+	{ value: "system", label: "System", icon: <Monitor className="h-4 w-4" /> },
+	{ value: "light", label: "Light", icon: <Sun className="h-4 w-4" /> },
+	{ value: "dark", label: "Dark", icon: <Moon className="h-4 w-4" /> },
 ];
 
 function getSystemTheme(): "light" | "dark" {

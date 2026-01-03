@@ -10,15 +10,7 @@
 		"frontendDist": "../dist"
 	},
 	"app": {
-		"windows": [
-			{
-				"title": "Seer",
-				"width": 800,
-				"height": 600,
-				"titleBarStyle": "Overlay",
-				"hiddenTitle": true
-			}
-		],
+		"windows": [],
 		"security": {
 			"csp": null
 		}
