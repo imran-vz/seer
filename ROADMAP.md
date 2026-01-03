@@ -27,12 +27,15 @@ This document outlines the planned features and development milestones for Seer.
 - 🟢 State management with zustand
 - 🟢 Biome config for formatting/linting
 
-### v0.3.0 - Media Analysis (Current)
+### v0.3.0 - Media Analysis ✅
 
 - 🟢 Detailed codec information display
 - 🟢 Stream analysis (video, audio, subtitles, attachments)
 - 🟢 Stream metadata viewing (language, title, flags)
-- 🟡 Bitrate graphs and statistics
+- 🟢 Bitrate graphs and statistics
+- 🟢 SQLite database for caching and job tracking
+- 🟢 Export bitrate charts as PNG (theme-aware)
+- 🟢 Export bitrate data as JSON/CSV
 - ⚪ Media file comparison tool
 - ⚪ Duplicate detection
 

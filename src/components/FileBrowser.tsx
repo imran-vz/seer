@@ -448,7 +448,7 @@ export function FileBrowser() {
 				<span className="text-right">Modified</span>
 			</div>
 
-			<ScrollArea className="flex-1">
+			<ScrollArea className="h-[calc(100%-6rem)] flex-1">
 				<div className="px-1 py-0.5">
 					{files.map((file) => (
 						<ContextMenu key={file.path}>

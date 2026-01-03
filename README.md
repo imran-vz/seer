@@ -12,11 +12,13 @@ A desktop application for media file management, metadata editing, codec detecti
 
 - **Advanced File Browser** - Navigate directories with context menus, bulk selection, and file operations (rename, move, copy, delete, new folder, reveal in Finder/Explorer)
 - **Media Analysis** - View detailed codec information and stream analysis for video, audio, subtitles, and attachments
+- **Bitrate Analysis** - Interactive bitrate graphs with per-stream visualization, statistics, and peak detection
+- **Export Options** - Export bitrate charts as PNG (theme-aware), or data as JSON/CSV
 - **Stream Management** - Inspect stream metadata (language, title, flags) and remove unwanted streams
 - **Metadata Display** - View file metadata using ffprobe
+- **SQLite Caching** - Persistent database for job tracking and analysis caching
 - **Cross-Platform** - Native experience on macOS, Windows, and Linux with Tauri
 - **Theme Support** - System, light, and dark themes
-- **Dependency Checking** - Onboarding flow to verify required tools are installed
 
 ### 🚧 Coming Soon
 
@@ -29,6 +31,7 @@ A desktop application for media file management, metadata editing, codec detecti
 
 - **Frontend**: React + Vite + TypeScript
 - **Backend**: Tauri (Rust)
+- **Database**: SQLite (via tauri-plugin-sql)
 - **State Management**: Zustand
 - **Media Processing**: FFmpeg / FFprobe
 - **Code Quality**: Biome (formatting & linting)
@@ -77,9 +80,17 @@ seer/
 ├── src/                 # Frontend source (TypeScript/React)
 │   ├── components/      # UI components
 │   ├── stores/          # Zustand state stores
+│   ├── lib/             # Utilities and database service
+│   ├── types/           # TypeScript type definitions
 │   └── index.css        # Global styles
 ├── src-tauri/           # Tauri backend (Rust)
-│   └── src/lib.rs       # Rust commands and logic
+│   └── src/
+│       ├── lib.rs       # Main entry point
+│       ├── database.rs  # SQLite migrations
+│       ├── commands/    # Tauri commands
+│       ├── bitrate/     # Bitrate analysis module
+│       ├── media/       # Media processing
+│       └── files/       # File operations
 ├── docs/                # Documentation website
 ├── public/              # Static assets
 └── index.html           # Entry point
