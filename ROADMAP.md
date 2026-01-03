@@ -6,7 +6,7 @@ This document outlines the planned features and development milestones for Seer.
 
 🟢 = Complete | 🟡 = In Progress | ⚪ = Planned
 
-### v0.1.0 - Foundation (Current)
+### v0.1.0 - Foundation ✅
 
 - 🟢 Project setup (Tauri + Vite + TypeScript)
 - 🟢 File browser with directory navigation
@@ -16,9 +16,34 @@ This document outlines the planned features and development milestones for Seer.
 - 🟢 Dependency checking and onboarding flow
 - 🟢 Cross-platform path detection for tools
 
-## Upcoming Releases
+### v0.2.0 - Advanced File Management ✅
 
-### v0.2.0 - Metadata Editing
+- 🟢 Advanced file browser with context menus
+- 🟢 Bulk file selection and actions
+- 🟢 File operations (rename, move, copy, delete)
+- 🟢 New folder creation
+- 🟢 Reveal in Finder/Explorer
+- 🟢 Clipboard integration
+- 🟢 State management with zustand
+- 🟢 Biome config for formatting/linting
+
+### v0.3.0 - Media Analysis (Current)
+
+- 🟢 Detailed codec information display
+- 🟢 Stream analysis (video, audio, subtitles, attachments)
+- 🟢 Stream metadata viewing (language, title, flags)
+- 🟡 Bitrate graphs and statistics
+- ⚪ Media file comparison tool
+- ⚪ Duplicate detection
+
+### v0.4.0 - Pruning & Stream Management
+
+- 🟢 Stream removal (unwanted audio/subtitle tracks)
+- ⚪ Lossless container conversion (remuxing)
+- ⚪ File size optimization suggestions
+- ⚪ Bulk stream operations with filters
+
+### v0.5.0 - Metadata Editing
 
 - ⚪ EXIF metadata viewing (images)
 - ⚪ EXIF metadata editing via ExifTool
@@ -27,15 +52,7 @@ This document outlines the planned features and development milestones for Seer.
 - ⚪ Batch metadata operations
 - ⚪ Metadata templates/presets
 
-### v0.3.0 - Media Analysis
-
-- ⚪ Detailed codec information display
-- ⚪ Stream analysis (video, audio, subtitles)
-- ⚪ Bitrate graphs and statistics
-- ⚪ Media file comparison tool
-- ⚪ Duplicate detection
-
-### v0.4.0 - Re-encoding
+### v0.6.0 - Re-encoding
 
 - ⚪ FFmpeg-based transcoding
 - ⚪ Preset encoding profiles
@@ -44,14 +61,7 @@ This document outlines the planned features and development milestones for Seer.
 - ⚪ Queue management for batch encoding
 - ⚪ Hardware acceleration support (NVENC, VideoToolbox, VAAPI)
 
-### v0.5.0 - Pruning & Optimization
-
-- ⚪ Stream removal (unwanted audio/subtitle tracks)
-- ⚪ Lossless container conversion
-- ⚪ File size optimization suggestions
-- ⚪ Bulk operations with filters
-
-### v0.6.0 - Organization
+### v0.7.0 - Organization
 
 - ⚪ Custom file naming templates
 - ⚪ Automatic file organization rules
