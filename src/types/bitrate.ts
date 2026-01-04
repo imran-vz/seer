@@ -10,6 +10,20 @@ export interface JobStatus {
 	running_seconds: number;
 }
 
+export interface JobInfo {
+	job_id: number;
+	path: string;
+	state: "queued" | "running";
+	queued_seconds?: number;
+	running_seconds?: number;
+}
+
+export interface QueueStatus {
+	queued: JobInfo[];
+	running: JobInfo[];
+	max_parallel: number;
+}
+
 export interface PeakInterval {
 	start_time: number;
 	end_time: number;

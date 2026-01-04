@@ -66,9 +66,9 @@ function App() {
 						<TabsList>
 							<TabsTrigger value="metadata">Metadata</TabsTrigger>
 							<TabsTrigger value="streams">Streams</TabsTrigger>
-							{showBitrateTab && (
-								<TabsTrigger value="bitrate">Bitrate</TabsTrigger>
-							)}
+							<TabsTrigger disabled={!showBitrateTab} value="bitrate">
+								Bitrate
+							</TabsTrigger>
 						</TabsList>
 					</div>
 

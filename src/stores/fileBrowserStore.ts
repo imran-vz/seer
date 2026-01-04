@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
+import { useSettingsStore } from "./settingsStore";
 
 export interface FileEntry {
 	name: string;
@@ -23,11 +24,12 @@ interface FileBrowserState {
 	selectedPaths: Set<string>;
 	error: string | null;
 	loading: boolean;
+	initialized: boolean;
 
 	// Actions
 	setCurrentPath: (path: string) => void;
 	setSelectedPath: (path: string | null) => void;
-	loadDirectory: (path: string) => Promise<void>;
+	loadDirectory: (path: string, saveToSettings?: boolean) => Promise<void>;
 	refresh: () => Promise<void>;
 	goUp: () => Promise<void>;
 	navigate: (entry: FileEntry) => Promise<void>;
@@ -70,16 +72,28 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
 	selectedPaths: new Set<string>(),
 	error: null,
 	loading: false,
+	initialized: false,
 
 	setCurrentPath: (path) => set({ currentPath: path }),
 
 	setSelectedPath: (path) => set({ selectedPath: path }),
 
-	loadDirectory: async (path: string) => {
+	loadDirectory: async (path: string, saveToSettings = true) => {
 		set({ loading: true, error: null, selectedPaths: new Set() });
 		try {
 			const entries = await invoke<FileEntry[]>("list_directory", { path });
 			set({ files: entries, currentPath: path, loading: false });
+
+			// Save last directory to settings if enabled
+			if (saveToSettings) {
+				const settingsStore = useSettingsStore.getState();
+				if (settingsStore.settings.startInLastDirectory) {
+					// Don't await this - let it happen in the background
+					settingsStore.setLastDirectory(path).catch((err) => {
+						console.warn("[FileBrowser] Failed to save last directory:", err);
+					});
+				}
+			}
 		} catch (e) {
 			set({ error: String(e), loading: false });
 		}
@@ -87,7 +101,7 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
 
 	refresh: async () => {
 		const { currentPath, loadDirectory } = get();
-		await loadDirectory(currentPath);
+		await loadDirectory(currentPath, false); // Don't save on refresh
 	},
 
 	goUp: async () => {
@@ -112,12 +126,62 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
 	},
 
 	initialize: async () => {
+		// Prevent double initialization
+		if (get().initialized) return;
+
 		const { loadDirectory } = get();
+
 		try {
-			const home = await invoke<string>("get_home_dir");
-			await loadDirectory(home);
+			// Initialize settings store first
+			const settingsStore = useSettingsStore.getState();
+			await settingsStore.initialize();
+
+			const { settings } = settingsStore;
+			let initialPath: string | null = null;
+
+			// Check if we should use the last directory
+			if (settings.startInLastDirectory && settings.lastDirectory) {
+				// Validate the last directory still exists
+				try {
+					const result = await invoke<{ valid: boolean; exists: boolean }>(
+						"validate_path",
+						{
+							path: settings.lastDirectory,
+							createIfMissing: false,
+						},
+					);
+
+					if (result.valid && result.exists) {
+						initialPath = settings.lastDirectory;
+						console.log(
+							"[FileBrowser] Using last directory:",
+							settings.lastDirectory,
+						);
+					}
+				} catch (err) {
+					console.warn("[FileBrowser] Failed to validate last directory:", err);
+				}
+			}
+
+			// Fall back to home directory if no valid last directory
+			if (!initialPath) {
+				initialPath = await invoke<string>("get_home_dir");
+				console.log("[FileBrowser] Using home directory:", initialPath);
+			}
+
+			set({ initialized: true });
+			await loadDirectory(initialPath, false); // Don't save initial load
 		} catch (e) {
-			set({ error: String(e) });
+			console.error("[FileBrowser] Initialization error:", e);
+			set({ error: String(e), initialized: true });
+
+			// Try to at least load the home directory as fallback
+			try {
+				const home = await invoke<string>("get_home_dir");
+				await loadDirectory(home, false);
+			} catch (fallbackError) {
+				console.error("[FileBrowser] Fallback also failed:", fallbackError);
+			}
 		}
 	},
 

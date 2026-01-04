@@ -2,21 +2,35 @@
 //!
 //! This module contains all Tauri commands for bitrate analysis operations,
 //! including progress reporting via Tauri window events.
+//!
+//! Note: Caching is handled by the frontend via SQLite database.
+//! The backend focuses purely on analysis - the frontend checks the DB cache
+//! before calling these analysis functions and saves results after completion.
 
 use log::{debug, error, info, warn};
 use std::sync::atomic::Ordering;
 use tauri::Emitter;
 
 use crate::bitrate::{
-    self, aggregate_bitrate_intervals, calculate_statistics, clear_cache, get_cached_analysis,
-    parse_ffprobe_frames, save_to_cache, sort_streams_audio_first, JobStartResult,
+    self, aggregate_bitrate_intervals, calculate_statistics, compute_file_hash,
+    parse_ffprobe_frames, sort_streams_audio_first, JobStartResult,
 };
 use crate::files::get_file_metadata;
 use crate::media::get_media_streams;
 use crate::types::{
     BitrateAnalysis, BitrateDataPoint, BitrateProgress, JobStatus, OverallBitrateAnalysis,
-    StreamContribution, StreamType,
+    QueueStatus, StreamContribution, StreamType,
 };
+
+/// Compute a file hash for cache validation
+///
+/// This hash is based on file size, modification time, and sample bytes from
+/// the beginning and end of the file. It's fast to compute and good for
+/// detecting file changes without reading the entire file.
+#[tauri::command]
+pub fn compute_file_hash_cmd(path: String) -> Result<String, String> {
+    compute_file_hash(&path)
+}
 
 /// Analyze bitrate for a specific stream in a media file
 #[tauri::command]
@@ -29,20 +43,32 @@ pub async fn analyze_stream_bitrate(
     let path_clone = path.clone();
     let window_clone = window.clone();
 
-    // Try to start a new job - if one is already running, return error
-    let job = match bitrate::start_job(&path_clone) {
-        JobStartResult::Started(job) => job,
-        JobStartResult::AlreadyRunning(job_id) => {
+    // Compute file hash for job ID
+    let file_hash = compute_file_hash(&path_clone)?;
+    let file_hash_clone = file_hash.clone();
+
+    // Enqueue job - starts immediately if slot available, otherwise queues
+    let (job_id, cancelled) = match bitrate::enqueue_job(&path_clone, &file_hash) {
+        JobStartResult::Started(id) | JobStartResult::Queued(id) => {
+            // Get cancellation flag from the job
+            let cancel_flag = bitrate::get_job_cancel_flag(&path_clone)
+                .ok_or("Failed to get job cancellation flag")?;
+            (id, cancel_flag)
+        }
+        JobStartResult::AlreadyExists(job_id) => {
             return Err(format!(
-                "Analysis already in progress for this file (job {})",
+                "Analysis already queued or in progress for this file (job {})",
                 job_id
             ));
         }
     };
 
-    let job_id = job.id;
-    let cancelled = job.cancelled.clone();
     let path_for_cleanup = path_clone.clone();
+
+    // Emit queue update
+    window
+        .emit("job-queue-update", bitrate::get_queue_status())
+        .ok();
 
     // Run in blocking thread to avoid blocking async runtime
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -188,12 +214,21 @@ pub async fn analyze_stream_bitrate(
     .map_err(|e| format!("Task join error: {}", e))?;
 
     // Clean up the job
-    bitrate::complete_job(&path_for_cleanup, job_id);
+    bitrate::complete_job(&path_for_cleanup, &file_hash_clone);
+
+    // Emit queue update after completion
+    window
+        .emit("job-queue-update", bitrate::get_queue_status())
+        .ok();
 
     result
 }
 
 /// Analyze overall bitrate for a media file (all streams combined)
+///
+/// Note: Caching is handled by the frontend. The frontend should:
+/// 1. Check the database cache before calling this function
+/// 2. Save the result to the database after this function returns
 #[tauri::command]
 pub async fn analyze_overall_bitrate(
     path: String,
@@ -203,43 +238,32 @@ pub async fn analyze_overall_bitrate(
     let path_clone = path.clone();
     let window_clone = window.clone();
 
-    // Check cache first
-    if let Some(cached) = get_cached_analysis(&path_clone) {
-        info!("Returning cached analysis for: {}", path_clone);
-        // Emit complete progress
-        window_clone
-            .emit(
-                "bitrate-progress",
-                BitrateProgress {
-                    current: 100,
-                    total: 100,
-                    percentage: 100.0,
-                    stage: "Loaded from cache".to_string(),
-                },
-            )
-            .ok();
-        // Return cached result with updated path (in case file was moved/copied)
-        return Ok(OverallBitrateAnalysis {
-            path: path_clone,
-            from_cache: true,
-            ..cached
-        });
-    }
+    // Compute file hash for job ID
+    let file_hash = compute_file_hash(&path_clone)?;
+    let file_hash_clone = file_hash.clone();
 
-    // Try to start a new job - if one is already running, return error
-    let job = match bitrate::start_job(&path_clone) {
-        JobStartResult::Started(job) => job,
-        JobStartResult::AlreadyRunning(job_id) => {
+    // Enqueue job - starts immediately if slot available, otherwise queues
+    let (job_id, cancelled) = match bitrate::enqueue_job(&path_clone, &file_hash) {
+        JobStartResult::Started(id) | JobStartResult::Queued(id) => {
+            // Get cancellation flag from the job
+            let cancel_flag = bitrate::get_job_cancel_flag(&path_clone)
+                .ok_or("Failed to get job cancellation flag")?;
+            (id, cancel_flag)
+        }
+        JobStartResult::AlreadyExists(job_id) => {
             return Err(format!(
-                "Analysis already in progress for this file (job {})",
+                "Analysis already queued or in progress for this file (job {})",
                 job_id
             ));
         }
     };
 
-    let job_id = job.id;
-    let cancelled = job.cancelled.clone();
     let path_for_cleanup = path_clone.clone();
+
+    // Emit queue update
+    window
+        .emit("job-queue-update", bitrate::get_queue_status())
+        .ok();
 
     // Run in blocking thread to avoid blocking async runtime
     let result = tauri::async_runtime::spawn_blocking(move || {
@@ -532,32 +556,63 @@ pub async fn analyze_overall_bitrate(
     .map_err(|e| format!("Task join error: {}", e))?;
 
     // Clean up the job
-    bitrate::complete_job(&path_for_cleanup, job_id);
+    bitrate::complete_job(&path_for_cleanup, &file_hash_clone);
 
-    // Cache the successful result
-    if let Ok(ref analysis) = result {
-        if let Err(e) = save_to_cache(&path_for_cleanup, analysis) {
-            warn!("Failed to cache analysis result: {}", e);
-        }
-    }
+    // Emit queue update after completion
+    window
+        .emit("job-queue-update", bitrate::get_queue_status())
+        .ok();
+
+    // Note: Caching is now handled by the frontend
+    // The frontend will save this result to the SQLite database
 
     result
 }
 
 /// Cancel an ongoing bitrate analysis for a file
 #[tauri::command]
-pub async fn cancel_bitrate_analysis(path: String) -> Result<bool, String> {
-    Ok(bitrate::cancel_job(&path))
+pub async fn cancel_bitrate_analysis(path: String, window: tauri::Window) -> Result<bool, String> {
+    let result = bitrate::cancel_job(&path);
+    // Emit queue update after cancellation
+    window
+        .emit("job-queue-update", bitrate::get_queue_status())
+        .ok();
+    Ok(result)
 }
 
-/// Get the status of all active bitrate analysis jobs
+/// Cancel all bitrate analysis jobs (queued and running)
+#[tauri::command]
+pub async fn cancel_all_bitrate_jobs(window: tauri::Window) -> Result<(), String> {
+    bitrate::cancel_all_jobs();
+    // Emit queue update after cancelling all
+    window
+        .emit("job-queue-update", bitrate::get_queue_status())
+        .ok();
+    Ok(())
+}
+
+/// Get the status of all active bitrate analysis jobs (legacy)
 #[tauri::command]
 pub async fn get_bitrate_job_status() -> Result<Vec<JobStatus>, String> {
     Ok(bitrate::get_active_jobs())
 }
 
-/// Clear the bitrate analysis cache
+/// Get queue status (both queued and running jobs)
 #[tauri::command]
-pub async fn clear_bitrate_cache_cmd() -> Result<usize, String> {
-    clear_cache()
+pub async fn get_queue_status() -> Result<QueueStatus, String> {
+    Ok(bitrate::get_queue_status())
+}
+
+/// Set the maximum number of parallel jobs (1-8)
+#[tauri::command]
+pub async fn set_max_parallel_jobs(count: usize, window: tauri::Window) -> Result<(), String> {
+    if count < 1 || count > 8 {
+        return Err("Max parallel jobs must be between 1 and 8".to_string());
+    }
+    bitrate::set_max_parallel_jobs(count);
+    // Emit queue update after changing limit (may start queued jobs)
+    window
+        .emit("job-queue-update", bitrate::get_queue_status())
+        .ok();
+    Ok(())
 }

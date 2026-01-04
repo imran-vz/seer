@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { stat } from "@tauri-apps/plugin-fs";
 import { toast } from "sonner";
 import { create } from "zustand";
 import {
@@ -12,7 +14,34 @@ import type {
 	BitrateAnalysis,
 	JobStatus,
 	OverallBitrateAnalysis,
+	QueueStatus,
 } from "@/types/bitrate";
+
+/**
+ * Compute file hash using the backend command
+ * This uses file size, mtime, and sample bytes for fast cache validation
+ */
+async function computeFileHash(path: string): Promise<string> {
+	try {
+		return await invoke<string>("compute_file_hash_cmd", { path });
+	} catch (error) {
+		console.error("[BitrateStore] Failed to compute file hash:", error);
+		// Return a timestamp-based fallback that won't match any cached hash
+		return `fallback-${Date.now()}`;
+	}
+}
+
+/**
+ * Get file size using Tauri fs plugin
+ */
+async function getFileSize(path: string): Promise<number> {
+	try {
+		const fileStat = await stat(path);
+		return fileStat.size;
+	} catch {
+		return 0;
+	}
+}
 
 interface BitrateState {
 	currentAnalysis: BitrateAnalysis | OverallBitrateAnalysis | null;
@@ -26,6 +55,7 @@ interface BitrateState {
 
 	// Job tracking
 	currentJobPath: string | null;
+	queueStatus: QueueStatus | null;
 
 	// Cache stats
 	cacheStats: {
@@ -38,6 +68,7 @@ interface BitrateState {
 	analyzeOverall: (path: string, fileHash?: string) => Promise<void>;
 	forceAnalyze: (path: string) => Promise<void>;
 	cancelAnalysis: () => Promise<void>;
+	cancelAllJobs: () => Promise<void>;
 	setAnalysisMode: (mode: "overall" | "per-stream") => void;
 	setSelectedStreamIndex: (index: number | null) => void;
 	setIntervalSeconds: (interval: number) => void;
@@ -47,7 +78,15 @@ interface BitrateState {
 	exportData: (format: "json" | "csv") => void;
 	getJobStatus: () => Promise<JobStatus[]>;
 	refreshCacheStats: () => Promise<void>;
+	computeFileHash: (path: string) => Promise<string>;
 }
+
+// Set up event listener for queue updates
+listen<QueueStatus>("job-queue-update", (event) => {
+	useBitrateStore.setState({ queueStatus: event.payload });
+}).catch((error) => {
+	console.error("[BitrateStore] Failed to set up queue listener:", error);
+});
 
 export const useBitrateStore = create<BitrateState>((set, get) => ({
 	currentAnalysis: null,
@@ -57,6 +96,7 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 	selectedStreamIndex: null,
 	intervalSeconds: 1.0,
 	currentJobPath: null,
+	queueStatus: null,
 	cacheStats: null,
 
 	analyzeStream: async (path: string, streamIndex: number) => {
@@ -92,6 +132,14 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 			// Don't show error if it was a cancellation
 			if (errorMessage.includes("cancelled")) {
 				set({ loading: false, currentJobPath: null });
+			}
+			// If already queued/running, keep loading state to show progress
+			else if (
+				errorMessage.includes("already queued") ||
+				errorMessage.includes("already in progress")
+			) {
+				console.log("[BitrateStore] Job already queued/running, showing existing progress");
+				// Keep loading: true and currentJobPath set so progress events are displayed
 			} else {
 				set({
 					error: errorMessage,
@@ -102,7 +150,7 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 		}
 	},
 
-	analyzeOverall: async (path: string, fileHash?: string) => {
+	analyzeOverall: async (path: string, providedFileHash?: string) => {
 		const { currentJobPath, intervalSeconds } = get();
 
 		// If already analyzing this file, don't start another
@@ -115,6 +163,9 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 		set({ loading: true, error: null, currentJobPath: path });
 
 		try {
+			// Compute file hash using backend if not provided
+			const fileHash = providedFileHash || (await computeFileHash(path));
+
 			// Check database cache first
 			const cached = await getBitrateAnalysis(path, fileHash);
 			if (cached) {
@@ -127,7 +178,7 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 				return;
 			}
 
-			// No cache hit, perform analysis
+			// No cache hit, perform analysis via backend
 			const result = await invoke<OverallBitrateAnalysis>(
 				"analyze_overall_bitrate",
 				{
@@ -139,43 +190,45 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 			console.log(
 				"[BitrateStore] Overall analysis complete:",
 				result.statistics,
-				result.from_cache ? "(from Rust cache)" : "(fresh)",
 			);
 
-			// Save to database if it's a fresh analysis
-			if (!result.from_cache && fileHash) {
-				try {
-					// Get file size from the result or use 0 as fallback
-					const fileSize = 0; // We'll get this from metadata if needed
-					await saveBitrateAnalysis(
-						result,
-						fileHash,
-						fileSize,
-						intervalSeconds,
-					);
-					console.log("[BitrateStore] Saved analysis to database");
-					await get().refreshCacheStats();
-				} catch (saveError) {
-					console.error(
-						"[BitrateStore] Failed to save analysis to database:",
-						saveError,
-					);
-					// Don't fail the whole operation if caching fails
-				}
+			// Save to database cache
+			try {
+				const fileSize = await getFileSize(path);
+				await saveBitrateAnalysis(result, fileHash, fileSize, intervalSeconds);
+				console.log("[BitrateStore] Saved analysis to database cache");
+				await get().refreshCacheStats();
+			} catch (saveError) {
+				console.error(
+					"[BitrateStore] Failed to save analysis to database:",
+					saveError,
+				);
+				// Don't fail the whole operation if caching fails
 			}
 
-			set({ currentAnalysis: result, loading: false, currentJobPath: null });
+			// Mark as from_cache: false since it's a fresh analysis
+			set({
+				currentAnalysis: { ...result, from_cache: false },
+				loading: false,
+				currentJobPath: null,
+			});
 		} catch (error) {
 			console.error("[BitrateStore] Overall analysis error:", error);
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
 
-			// Don't show error if it was a cancellation or already running
-			if (
-				errorMessage.includes("cancelled") ||
+			// Don't show error if it was a cancellation
+			if (errorMessage.includes("cancelled")) {
+				set({ loading: false, currentJobPath: null });
+			}
+			// If already queued/running, keep loading state to show progress
+			else if (
+				errorMessage.includes("already queued") ||
 				errorMessage.includes("already in progress")
 			) {
-				set({ loading: false, currentJobPath: null });
+				console.log("[BitrateStore] Job already queued/running, showing existing progress");
+				// Keep loading: true and currentJobPath set so progress events are displayed
+				// Don't set error - this is expected behavior
 			} else {
 				set({
 					error: errorMessage,
@@ -193,12 +246,14 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 			// Clear database cache for this file
 			await deleteBitrateAnalysisByPath(path);
 
-			// Also clear Rust-side cache
-			await invoke("clear_bitrate_cache_cmd");
-
 			// Reset state and analyze
 			set({ currentAnalysis: null, error: null });
-			await get().analyzeOverall(path);
+
+			// Compute fresh hash
+			const fileHash = await computeFileHash(path);
+
+			// Start fresh analysis (will skip cache check since we just cleared it)
+			await get().analyzeOverall(path, fileHash);
 			await get().refreshCacheStats();
 		} catch (error) {
 			console.error("[BitrateStore] Force analyze error:", error);
@@ -228,6 +283,17 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 		}
 	},
 
+	cancelAllJobs: async () => {
+		console.log("[BitrateStore] Cancelling all jobs");
+		try {
+			await invoke("cancel_all_bitrate_jobs");
+			console.log("[BitrateStore] All jobs cancelled successfully");
+			set({ loading: false, currentJobPath: null });
+		} catch (error) {
+			console.error("[BitrateStore] Failed to cancel all jobs:", error);
+		}
+	},
+
 	setAnalysisMode: (mode) => set({ analysisMode: mode }),
 
 	setSelectedStreamIndex: (index) => set({ selectedStreamIndex: index }),
@@ -244,19 +310,13 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 
 	clearCache: async () => {
 		try {
-			// Clear database cache
+			// Clear database cache only (file-based cache has been removed)
 			const dbCount = await clearAllBitrateAnalysis();
-
-			// Also clear Rust-side file cache
-			const rustCount = await invoke<number>("clear_bitrate_cache_cmd");
-
-			const totalCount = dbCount + rustCount;
 			console.log(
-				`[BitrateStore] Cleared ${dbCount} DB analyses + ${rustCount} file cache = ${totalCount} total`,
+				`[BitrateStore] Cleared ${dbCount} cached analyses from database`,
 			);
-
 			await get().refreshCacheStats();
-			return totalCount;
+			return dbCount;
 		} catch (error) {
 			console.error("[BitrateStore] Failed to clear cache:", error);
 			return 0;
@@ -329,5 +389,9 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 		} catch (error) {
 			console.error("[BitrateStore] Failed to refresh cache stats:", error);
 		}
+	},
+
+	computeFileHash: async (path: string) => {
+		return computeFileHash(path);
 	},
 }));

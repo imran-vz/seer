@@ -176,6 +176,45 @@ pub fn get_migrations() -> Vec<Migration> {
             "#,
             kind: MigrationKind::Up,
         },
+        // Migration 9: Create settings table for app configuration
+        Migration {
+            version: 9,
+            description: "create_settings_table",
+            sql: r#"
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY NOT NULL,
+                    value TEXT NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                );
+
+                -- Insert default settings
+                INSERT OR IGNORE INTO settings (key, value) VALUES ('default_download_location', '');
+                INSERT OR IGNORE INTO settings (key, value) VALUES ('start_in_last_directory', 'true');
+                INSERT OR IGNORE INTO settings (key, value) VALUES ('last_directory', '');
+                INSERT OR IGNORE INTO settings (key, value) VALUES ('show_hidden_files', 'false');
+                INSERT OR IGNORE INTO settings (key, value) VALUES ('confirm_before_delete', 'true');
+                INSERT OR IGNORE INTO settings (key, value) VALUES ('use_trash_by_default', 'true');
+                INSERT OR IGNORE INTO settings (key, value) VALUES ('enable_caching', 'true');
+                INSERT OR IGNORE INTO settings (key, value) VALUES ('cache_expiration_days', '30');
+            "#,
+            kind: MigrationKind::Up,
+        },
+        // Migration 10: Add job queue support and max parallel jobs setting
+        Migration {
+            version: 10,
+            description: "add_job_queue_support",
+            sql: r#"
+                -- Add queue position column for job ordering
+                ALTER TABLE jobs ADD COLUMN queue_position INTEGER;
+
+                -- Add index for efficient queue queries
+                CREATE INDEX IF NOT EXISTS idx_jobs_queue_position ON jobs(queue_position);
+
+                -- Add max parallel jobs setting
+                INSERT OR IGNORE INTO settings (key, value) VALUES ('max_parallel_jobs', '2');
+            "#,
+            kind: MigrationKind::Up,
+        },
     ]
 }
 

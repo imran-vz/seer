@@ -29,28 +29,6 @@ interface BitratePanelProps {
 	filePath: string | null;
 }
 
-/**
- * Generate a simple hash from file metadata for cache invalidation
- * This is faster than reading file contents
- */
-async function computeFileHash(filePath: string): Promise<string> {
-	try {
-		const fileStat = await stat(filePath);
-		// Combine path, size, and mtime for a quick hash
-		const hashInput = `${filePath}:${fileStat.size}:${fileStat.mtime?.getTime() ?? 0}`;
-		// Simple hash using built-in crypto
-		const encoder = new TextEncoder();
-		const data = encoder.encode(hashInput);
-		const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-		const hashArray = Array.from(new Uint8Array(hashBuffer));
-		return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-	} catch (error) {
-		console.error("[BitratePanel] Failed to compute file hash:", error);
-		// Return a timestamp-based fallback that won't match any cached hash
-		return `fallback-${Date.now()}`;
-	}
-}
-
 export function BitratePanel({ filePath }: BitratePanelProps) {
 	const {
 		currentAnalysis,
@@ -58,6 +36,7 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 		error,
 		analysisMode,
 		selectedStreamIndex,
+		currentJobPath,
 		analyzeOverall,
 		forceAnalyze,
 		cancelAnalysis,
@@ -65,6 +44,7 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 		exportData,
 		cacheStats,
 		refreshCacheStats,
+		computeFileHash,
 	} = useBitrateStore();
 
 	const chartRef = useRef<BitrateChartHandle>(null);
@@ -93,16 +73,28 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 
 	useEffect(() => {
 		// Check if we need to analyze a new file
-		if (filePath && filePath !== lastAnalyzedPath && !loading) {
+		// Allow starting analysis if:
+		// 1. We have a file path
+		// 2. It's different from the last analyzed path
+		// 3. Either not loading, OR loading a different file (allows switching while bg job runs)
+		const isLoadingDifferentFile = loading && currentJobPath !== filePath;
+		const canStartAnalysis =
+			filePath &&
+			filePath !== lastAnalyzedPath &&
+			(!loading || isLoadingDifferentFile);
+
+		if (canStartAnalysis) {
 			// Clear previous analysis if it's for a different file
 			if (currentAnalysis && currentAnalysis.path !== filePath) {
-				clearAnalysis();
+				// Don't call clearAnalysis() as it would cancel running job
+				// Just reset the progress for the new file
 				setProgress(null);
 			}
 
 			// Get file stats and compute hash
 			stat(filePath)
 				.then(async (fileStat) => {
+					// Use the store's computeFileHash which calls the backend
 					const fileHash = await computeFileHash(filePath);
 					const sizeGB = fileStat.size / (1024 * 1024 * 1024);
 
@@ -132,9 +124,11 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 		filePath,
 		lastAnalyzedPath,
 		loading,
+		currentJobPath,
 		currentAnalysis,
 		analyzeOverall,
 		clearAnalysis,
+		computeFileHash,
 	]);
 
 	const handleConfirmAnalysis = () => {
@@ -163,6 +157,16 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 	const analysisMatchesFile =
 		currentAnalysis && filePath && currentAnalysis.path === filePath;
 
+	// Check if loading is for the current file (not a different file)
+	const isLoadingForCurrentFile = loading && currentJobPath === filePath;
+
+	// Check if there's a background job running for a different file
+	const isLoadingOtherFile =
+		loading && currentJobPath && currentJobPath !== filePath;
+
+	// Get filename for display
+	const loadingFileName = currentJobPath?.split("/").pop() || currentJobPath;
+
 	// Check if result is from cache
 	const isFromCache =
 		analysisMatchesFile &&
@@ -186,7 +190,7 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 		);
 	}
 
-	if (loading) {
+	if (isLoadingForCurrentFile) {
 		return (
 			<div className="flex h-full items-center justify-center">
 				<div className="w-full max-w-md px-8 text-center">
@@ -258,10 +262,20 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 
 	if (!currentAnalysis || !analysisMatchesFile) {
 		return (
-			<div className="flex h-full items-center justify-center">
-				<p className="text-muted-foreground text-sm">
-					No analysis data available
-				</p>
+			<div className="flex h-full items-center justify-center p-8 text-center text-muted-foreground">
+				<div>
+					<p className="font-medium text-base">No analysis data</p>
+					<p className="text-sm">
+						{isLoadingOtherFile
+							? "Another analysis is running in the background"
+							: "Select this file's Bitrate tab to analyze"}
+					</p>
+					{isLoadingOtherFile && loadingFileName && (
+						<p className="mt-2 max-w-xs truncate text-muted-foreground/60 text-xs">
+							Analyzing: {loadingFileName}
+						</p>
+					)}
+				</div>
 			</div>
 		);
 	}

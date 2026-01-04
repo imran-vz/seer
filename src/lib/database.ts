@@ -298,6 +298,18 @@ export async function cleanupOldJobs(daysOld = 30): Promise<number> {
 }
 
 /**
+ * Clear all jobs from the database
+ */
+export async function clearAllJobs(): Promise<number> {
+	const database = await getDatabase();
+
+	const result = await database.execute("DELETE FROM jobs");
+
+	console.log(`[Database] Cleared ${result.rowsAffected} jobs`);
+	return result.rowsAffected;
+}
+
+/**
  * Get job statistics
  */
 export async function getJobStatistics(): Promise<JobStatistics> {

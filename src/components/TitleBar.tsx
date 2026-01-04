@@ -1,4 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { JobIndicator } from "./JobIndicator";
+import { SettingsDialog } from "./SettingsDialog";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
 export function TitleBar() {
@@ -42,7 +44,9 @@ export function TitleBar() {
 			<div className="flex-1" />
 
 			{/* Right side controls */}
-			<div data-no-drag>
+			<div data-no-drag className="flex items-center gap-1">
+				<JobIndicator />
+				<SettingsDialog />
 				<ThemeSwitcher />
 			</div>
 		</header>

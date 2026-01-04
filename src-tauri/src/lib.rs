@@ -28,6 +28,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_log::Builder::new()
                 .target(tauri_plugin_log::Target::new(
@@ -62,8 +63,17 @@ pub fn run() {
             commands::analyze_stream_bitrate,
             commands::analyze_overall_bitrate,
             commands::cancel_bitrate_analysis,
+            commands::cancel_all_bitrate_jobs,
             commands::get_bitrate_job_status,
-            commands::clear_bitrate_cache_cmd,
+            commands::get_queue_status,
+            commands::set_max_parallel_jobs,
+            commands::compute_file_hash_cmd,
+            // Settings operations
+            commands::get_initial_directory,
+            commands::validate_path,
+            commands::pick_folder,
+            commands::save_last_directory,
+            commands::get_default_downloads_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

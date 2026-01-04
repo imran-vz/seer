@@ -184,6 +184,22 @@ pub struct JobStatus {
     pub running_seconds: f64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct JobInfo {
+    pub job_id: u64,
+    pub path: String,
+    pub state: String,
+    pub queued_seconds: Option<f64>,
+    pub running_seconds: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct QueueStatus {
+    pub queued: Vec<JobInfo>,
+    pub running: Vec<JobInfo>,
+    pub max_parallel: usize,
+}
+
 // ============================================================================
 // Dependency Check Types
 // ============================================================================
