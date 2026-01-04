@@ -25,3 +25,4 @@ dist-ssr
 .mcp.json
 AGENTS.md
 CLAUDE.md
+actions-runner/
