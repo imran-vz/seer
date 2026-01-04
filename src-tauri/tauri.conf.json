@@ -18,6 +18,24 @@
 	"bundle": {
 		"active": true,
 		"targets": "all",
-		"icon": ["icons/128x128@2x.png", "icons/512x512.png"]
+		"icon": ["icons/128x128@2x.png", "icons/512x512.png"],
+		"macOS": {
+			"signingIdentity": "-",
+			"dmg": {
+				"windowSize": {
+					"width": 660,
+					"height": 400
+				},
+				"appPosition": {
+					"x": 180,
+					"y": 170
+				},
+				"applicationFolderPosition": {
+					"x": 480,
+					"y": 170
+				}
+			},
+			"minimumSystemVersion": "10.15"
+		}
 	}
 }

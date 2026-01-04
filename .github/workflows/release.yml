@@ -18,37 +18,48 @@ permissions:
   contents: write
 
 jobs:
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      release_id: ${{ steps.create_release.outputs.id }}
-      release_upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
+  publish-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
+
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get version
-        id: get_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${GITHUB_REF#refs/tags/}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v2
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
         with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          name: Seer ${{ steps.get_version.outputs.version }}
-          draft: true
-          prerelease: false
-          generate_release_notes: true
-          body: |
-            ## Seer ${{ steps.get_version.outputs.version }}
+          bun-version: latest
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Build and release with tauri-action
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.event.inputs.version || github.ref_name }}
+          releaseName: "Seer ${{ github.event.inputs.version || github.ref_name }}"
+          releaseBody: |
+            ## Seer ${{ github.event.inputs.version || github.ref_name }}
 
             A desktop application for media file management, metadata editing, codec detection, and re-encoding.
 
@@ -60,7 +71,8 @@ jobs:
 
             | Platform | Architecture | File |
             |----------|--------------|------|
-            | macOS | Apple Silicon (M1/M2/M3) | `Seer_*_aarch64.dmg` or `Seer.app.zip` |
+            | macOS | Apple Silicon (M1/M2/M3) | `Seer_*_aarch64.dmg` |
+            | macOS | Intel | `Seer_*_x64.dmg` |
 
             ---
 
@@ -83,56 +95,29 @@ jobs:
             ### 📄 License
 
             MIT License
-
-            ---
-
-            ### 🔄 Changelog
-
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-macos:
-    needs: create-release
-    runs-on: self-hosted
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install frontend dependencies
-        run: bun install
-
-      - name: Build Tauri app
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bun tauri build --target aarch64-apple-darwin -- --no-sign
-
-      - name: Zip .app bundle
-        run: |
-          cd src-tauri/target/aarch64-apple-darwin/release/bundle/macos
-          for app in *.app; do
-            zip -r "${app%.app}.app.zip" "$app"
-          done
-
-      - name: Upload DMG and App to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.create-release.outputs.version }}
-          files: |
-            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
-            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
 
   build-tarball:
-    needs: create-release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Create source tarball
         run: |
-          VERSION="${{ needs.create-release.outputs.version }}"
+          VERSION="${{ steps.get_version.outputs.version }}"
           VERSION_NUM="${VERSION#v}"
 
           # Create a clean directory for the tarball
@@ -157,21 +142,10 @@ jobs:
       - name: Upload tarball to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.create-release.outputs.version }}
+          tag_name: ${{ steps.get_version.outputs.version }}
+          draft: true
           files: |
             seer-*.tar.gz
             seer-*.tar.gz.sha256
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  publish-release:
-    needs: [create-release, build-macos, build-tarball]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.create-release.outputs.version }}
-          draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
