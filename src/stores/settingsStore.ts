@@ -204,9 +204,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 			if (key === "maxParallelJobs") {
 				try {
 					await invoke("set_max_parallel_jobs", { count: value });
-					console.log(`[SettingsStore] Updated backend max_parallel_jobs = ${value}`);
+					console.log(
+						`[SettingsStore] Updated backend max_parallel_jobs = ${value}`,
+					);
 				} catch (error) {
-					console.error("[SettingsStore] Failed to update backend max_parallel_jobs:", error);
+					console.error(
+						"[SettingsStore] Failed to update backend max_parallel_jobs:",
+						error,
+					);
 				}
 			}
 

@@ -138,7 +138,9 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 				errorMessage.includes("already queued") ||
 				errorMessage.includes("already in progress")
 			) {
-				console.log("[BitrateStore] Job already queued/running, showing existing progress");
+				console.log(
+					"[BitrateStore] Job already queued/running, showing existing progress",
+				);
 				// Keep loading: true and currentJobPath set so progress events are displayed
 			} else {
 				set({
@@ -226,7 +228,9 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 				errorMessage.includes("already queued") ||
 				errorMessage.includes("already in progress")
 			) {
-				console.log("[BitrateStore] Job already queued/running, showing existing progress");
+				console.log(
+					"[BitrateStore] Job already queued/running, showing existing progress",
+				);
 				// Keep loading: true and currentJobPath set so progress events are displayed
 				// Don't set error - this is expected behavior
 			} else {
