@@ -67,7 +67,7 @@ interface BitrateState {
 	analyzeStream: (path: string, streamIndex: number) => Promise<void>;
 	analyzeOverall: (path: string, fileHash?: string) => Promise<void>;
 	forceAnalyze: (path: string) => Promise<void>;
-	cancelAnalysis: () => Promise<void>;
+	cancelAnalysis: (path?: string) => Promise<void>;
 	cancelAllJobs: () => Promise<void>;
 	setAnalysisMode: (mode: "overall" | "per-stream") => void;
 	setSelectedStreamIndex: (index: number | null) => void;
@@ -260,21 +260,26 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 		}
 	},
 
-	cancelAnalysis: async () => {
+	cancelAnalysis: async (path?: string) => {
 		const { currentJobPath } = get();
-		if (!currentJobPath) {
+		const targetPath = path || currentJobPath;
+
+		if (!targetPath) {
 			console.log("[BitrateStore] No analysis to cancel");
 			return;
 		}
 
-		console.log(`[BitrateStore] Cancelling analysis for: ${currentJobPath}`);
+		console.log(`[BitrateStore] Cancelling analysis for: ${targetPath}`);
 		try {
 			const cancelled = await invoke<boolean>("cancel_bitrate_analysis", {
-				path: currentJobPath,
+				path: targetPath,
 			});
 			if (cancelled) {
 				console.log("[BitrateStore] Analysis cancelled successfully");
-				set({ loading: false, currentJobPath: null });
+				// Only clear currentJobPath if we cancelled the current job
+				if (targetPath === currentJobPath) {
+					set({ loading: false, currentJobPath: null });
+				}
 			} else {
 				console.log("[BitrateStore] No active job found to cancel");
 			}

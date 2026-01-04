@@ -45,7 +45,7 @@ export function JobIndicator() {
 	];
 
 	const handleCancelJob = async (job: DisplayJob) => {
-		await cancelAnalysis();
+		await cancelAnalysis(job.path);
 	};
 
 	const handleCancelAll = async () => {
@@ -79,7 +79,7 @@ export function JobIndicator() {
 						<Button
 							variant="ghost"
 							size="sm"
-							className="h-6 px-2 text-xs text-destructive hover:text-destructive"
+							className="h-6 px-2 text-destructive text-xs hover:text-destructive"
 							onClick={handleCancelAll}
 						>
 							Cancel All
