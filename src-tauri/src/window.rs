@@ -3,7 +3,7 @@
 //! This module handles window setup and platform-specific styling,
 //! particularly for macOS transparent titlebar and background color.
 
-use tauri::{TitleBarStyle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{LogicalPosition, TitleBarStyle, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 /// Background color for the window (#131313)
 const BG_COLOR_COMPONENT: f64 = 0.0745; // 19/255
@@ -18,7 +18,8 @@ pub fn create_main_window(app: &tauri::App) -> Result<WebviewWindow, tauri::Erro
     #[cfg(target_os = "macos")]
     let win_builder = win_builder
         .title_bar_style(TitleBarStyle::Transparent)
-        .hidden_title(true);
+        .hidden_title(true)
+        .traffic_light_position(LogicalPosition::new(16.0, 24.0));
 
     let window = win_builder.build()?;
 
