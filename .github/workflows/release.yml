@@ -1,0 +1,200 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag (e.g., v0.1.0)"
+        required: false
+        default: ""
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      release_id: ${{ steps.create_release.outputs.id }}
+      release_upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          name: Seer ${{ steps.get_version.outputs.version }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## Seer ${{ steps.get_version.outputs.version }}
+
+            A desktop application for media file management, metadata editing, codec detection, and re-encoding.
+
+            **Seer** (Tamil: சீர்) - to prune, order, uniformity, neatness.
+
+            ---
+
+            ### 📦 Downloads
+
+            | Platform | Architecture | File |
+            |----------|--------------|------|
+            | macOS | Apple Silicon (M1/M2/M3) | `Seer_*_aarch64.dmg` or `Seer.app.zip` |
+
+            ---
+
+            ### 👨‍💻 Developer
+
+            **Imran**
+            - 🌐 Website: [imran.codes](https://imran.codes)
+            - ☕ Support: [Buy Me a Coffee](https://buymeacoffee.com/imran.vz)
+            - 🐙 GitHub: [@imran-vz](https://github.com/imran-vz)
+
+            ---
+
+            ### 📋 Requirements
+
+            - **FFmpeg** - Required for media analysis
+            - **ExifTool** - Optional, for image metadata
+
+            ---
+
+            ### 📄 License
+
+            MIT License
+
+            ---
+
+            ### 🔄 Changelog
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    needs: create-release
+    runs-on: macos-14 # Apple Silicon runner
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ needs.create-release.outputs.version }}
+          releaseName: "Seer ${{ needs.create-release.outputs.version }}"
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          args: --target aarch64-apple-darwin
+
+      - name: Zip .app bundle
+        run: |
+          cd src-tauri/target/aarch64-apple-darwin/release/bundle/macos
+          for app in *.app; do
+            zip -r "${app%.app}.app.zip" "$app"
+          done
+
+      - name: Upload DMG and App to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: |
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+            src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-tarball:
+    needs: create-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create source tarball
+        run: |
+          VERSION="${{ needs.create-release.outputs.version }}"
+          VERSION_NUM="${VERSION#v}"
+
+          # Create a clean directory for the tarball
+          mkdir -p "seer-${VERSION_NUM}"
+
+          # Copy relevant files (excluding node_modules, target, dist, etc.)
+          rsync -av --progress . "seer-${VERSION_NUM}" \
+            --exclude "seer-${VERSION_NUM}" \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude 'src-tauri/target' \
+            --exclude 'dist' \
+            --exclude '.DS_Store' \
+            --exclude '*.log'
+
+          # Create tarball
+          tar -czvf "seer-${VERSION_NUM}.tar.gz" "seer-${VERSION_NUM}"
+
+          # Create checksum
+          sha256sum "seer-${VERSION_NUM}.tar.gz" > "seer-${VERSION_NUM}.tar.gz.sha256"
+
+      - name: Upload tarball to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          files: |
+            seer-*.tar.gz
+            seer-*.tar.gz.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-release:
+    needs: [create-release, build-macos, build-tarball]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.create-release.outputs.version }}
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
