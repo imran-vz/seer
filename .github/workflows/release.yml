@@ -18,24 +18,113 @@ permissions:
   contents: write
 
 jobs:
-  publish-tauri:
+  build-macos:
     runs-on: self-hosted
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Install frontend dependencies
         run: bun install
 
-      - name: Build and release with tauri-action
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Tauri app
+        run: bun tauri build --target aarch64-apple-darwin
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
         with:
-          tagName: ${{ github.event.inputs.version || github.ref_name }}
-          releaseName: "Seer ${{ github.event.inputs.version || github.ref_name }}"
-          releaseBody: |
-            ## Seer ${{ github.event.inputs.version || github.ref_name }}
+          name: macos-dmg
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+
+      - name: Upload App bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app
+          path: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app
+
+  build-tarball:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create source tarball
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          VERSION_NUM="${VERSION#v}"
+
+          mkdir -p "seer-${VERSION_NUM}"
+
+          rsync -av --progress . "seer-${VERSION_NUM}" \
+            --exclude "seer-${VERSION_NUM}" \
+            --exclude '.git' \
+            --exclude 'node_modules' \
+            --exclude 'src-tauri/target' \
+            --exclude 'dist' \
+            --exclude '.DS_Store' \
+            --exclude '*.log'
+
+          tar -czvf "seer-${VERSION_NUM}.tar.gz" "seer-${VERSION_NUM}"
+          sha256sum "seer-${VERSION_NUM}.tar.gz" > "seer-${VERSION_NUM}.tar.gz.sha256"
+
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-tarball
+          path: |
+            seer-*.tar.gz
+            seer-*.tar.gz.sha256
+
+  create-release:
+    needs: [build-macos, build-tarball]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release files
+        run: |
+          mkdir -p release-files
+          find artifacts -type f \( -name "*.dmg" -o -name "*.tar.gz" -o -name "*.sha256" \) -exec cp {} release-files/ \;
+          ls -la release-files/
+
+      - name: Create or update release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.build-macos.outputs.version }}
+          name: "Seer ${{ needs.build-macos.outputs.version }}"
+          draft: true
+          prerelease: false
+          fail_on_unmatched_files: false
+          files: release-files/*
+          body: |
+            ## Seer ${{ needs.build-macos.outputs.version }}
 
             A desktop application for media file management, metadata editing, codec detection, and re-encoding.
 
@@ -82,57 +171,5 @@ jobs:
             ### 📄 License
 
             MIT License
-          releaseDraft: true
-          prerelease: false
-          args: --target aarch64-apple-darwin
-
-  build-tarball:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Get version
-        id: get_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.version }}" ]; then
-            VERSION="${{ github.event.inputs.version }}"
-          else
-            VERSION="${GITHUB_REF#refs/tags/}"
-          fi
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Create source tarball
-        run: |
-          VERSION="${{ steps.get_version.outputs.version }}"
-          VERSION_NUM="${VERSION#v}"
-
-          # Create a clean directory for the tarball
-          mkdir -p "seer-${VERSION_NUM}"
-
-          # Copy relevant files (excluding node_modules, target, dist, etc.)
-          rsync -av --progress . "seer-${VERSION_NUM}" \
-            --exclude "seer-${VERSION_NUM}" \
-            --exclude '.git' \
-            --exclude 'node_modules' \
-            --exclude 'src-tauri/target' \
-            --exclude 'dist' \
-            --exclude '.DS_Store' \
-            --exclude '*.log'
-
-          # Create tarball
-          tar -czvf "seer-${VERSION_NUM}.tar.gz" "seer-${VERSION_NUM}"
-
-          # Create checksum
-          sha256sum "seer-${VERSION_NUM}.tar.gz" > "seer-${VERSION_NUM}.tar.gz.sha256"
-
-      - name: Upload tarball to Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.get_version.outputs.version }}
-          draft: true
-          files: |
-            seer-*.tar.gz
-            seer-*.tar.gz.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
