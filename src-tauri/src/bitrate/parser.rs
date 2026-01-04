@@ -11,6 +11,7 @@ use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Duration;
 
+use crate::media::find_command;
 use crate::types::{BitrateDataPoint, BitrateStatistics, PeakInterval, StreamInfo, StreamType};
 
 /// Parse ffprobe frame data for a specific stream
@@ -20,8 +21,11 @@ pub fn parse_ffprobe_frames(
     path: &str,
     stream_index: i32,
 ) -> Result<Vec<(f64, u64, Option<String>)>, String> {
+    // Find ffprobe binary (needed for release builds where PATH isn't inherited)
+    let ffprobe_cmd = find_command("ffprobe").unwrap_or_else(|| "ffprobe".to_string());
+
     // Spawn ffprobe process - use multiple timestamp fields for compatibility
-    let mut child = Command::new("ffprobe")
+    let mut child = Command::new(&ffprobe_cmd)
         .arg("-v")
         .arg("error") // Show errors instead of quiet
         .arg("-select_streams")
