@@ -19,34 +19,10 @@ permissions:
 
 jobs:
   publish-tauri:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: "macos-latest"
-            args: "--target aarch64-apple-darwin"
-          - platform: "macos-latest"
-            args: "--target x86_64-apple-darwin"
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: self-hosted
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: "./src-tauri -> target"
 
       - name: Install frontend dependencies
         run: bun install
@@ -72,7 +48,6 @@ jobs:
             | Platform | Architecture | File |
             |----------|--------------|------|
             | macOS | Apple Silicon (M1/M2/M3) | `Seer_*_aarch64.dmg` |
-            | macOS | Intel | `Seer_*_x64.dmg` |
 
             ---
 
@@ -97,7 +72,7 @@ jobs:
             MIT License
           releaseDraft: true
           prerelease: false
-          args: ${{ matrix.args }}
+          args: --target aarch64-apple-darwin
 
   build-tarball:
     runs-on: ubuntu-latest
