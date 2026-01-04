@@ -17,7 +17,7 @@ pub fn create_main_window(app: &tauri::App) -> Result<WebviewWindow, tauri::Erro
 
     #[cfg(target_os = "macos")]
     let win_builder = win_builder
-        .title_bar_style(TitleBarStyle::Transparent)
+        .title_bar_style(TitleBarStyle::Overlay)
         .hidden_title(true)
         .traffic_light_position(LogicalPosition::new(16.0, 24.0));
 
