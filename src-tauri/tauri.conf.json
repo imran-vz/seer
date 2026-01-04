@@ -20,7 +20,6 @@
 		"targets": "all",
 		"icon": ["icons/128x128@2x.png", "icons/512x512.png"],
 		"macOS": {
-			"signingIdentity": "-",
 			"dmg": {
 				"windowSize": {
 					"width": 660,
