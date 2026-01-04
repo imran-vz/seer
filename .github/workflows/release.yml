@@ -67,6 +67,18 @@ jobs:
 
             ---
 
+            ### ⚠️ macOS Installation
+
+            Since the app is not code-signed, macOS may show a "damaged" warning. To fix this, run in Terminal after installing:
+
+            ```
+            xattr -cr /Applications/Seer.app
+            ```
+
+            Then open the app normally.
+
+            ---
+
             ### 📄 License
 
             MIT License
