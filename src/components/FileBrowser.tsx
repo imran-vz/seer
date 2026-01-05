@@ -14,7 +14,7 @@ import {
 	Trash,
 	Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import {
 	AlertDialog,
@@ -65,7 +65,6 @@ export function FileBrowser() {
 		selectedPaths,
 		error,
 		loading,
-		initialize,
 		refresh,
 		goUp,
 		navigate,
@@ -90,10 +89,6 @@ export function FileBrowser() {
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 	const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
 	const [operationError, setOperationError] = useState<string | null>(null);
-
-	useEffect(() => {
-		initialize();
-	}, [initialize]);
 
 	const formatSize = (bytes: number): string => {
 		if (bytes === 0) return "-";
@@ -453,8 +448,10 @@ export function FileBrowser() {
 					{files.map((file) => (
 						<ContextMenu key={file.path}>
 							<ContextMenuTrigger asChild>
-								<button
-									type="button"
+								{/** biome-ignore lint/a11y/noStaticElementInteractions: need for context menu */}
+								<div
+									// biome-ignore lint/a11y/noNoninteractiveTabindex: need for context menu
+									tabIndex={0}
 									className={cn(
 										"grid w-full cursor-pointer grid-cols-[24px_20px_1fr_70px_130px] items-center gap-2 rounded px-3 py-1 text-[13px] transition-colors",
 										"hover:bg-accent/50",
@@ -468,6 +465,12 @@ export function FileBrowser() {
 									)}
 									onClick={() => selectFile(file)}
 									onDoubleClick={() => navigate(file)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											selectFile(file);
+										}
+									}}
 								>
 									<span className="flex items-center justify-center">
 										<Checkbox
@@ -494,7 +497,7 @@ export function FileBrowser() {
 									<span className="text-right text-[11px] text-muted-foreground/70">
 										{file.modified || "—"}
 									</span>
-								</button>
+								</div>
 							</ContextMenuTrigger>
 							<ContextMenuContent className="w-48">
 								{file.is_dir && (

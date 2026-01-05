@@ -5,11 +5,14 @@
 //! - Parsing stream information from media files
 //! - Removing streams from media files
 
+use log::debug;
 use serde_json;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use super::probe_cache;
+use crate::config;
 use crate::types::{MediaStreams, StreamInfo, StreamRemovalResult, StreamType};
 
 /// Get common search paths for finding executables
@@ -281,41 +284,24 @@ pub fn parse_stream(stream: &serde_json::Value) -> StreamInfo {
 }
 
 /// Get all media streams from a file using ffprobe
+///
+/// This function now uses the probe_cache module to avoid redundant ffprobe calls
+/// when the same file is queried multiple times (e.g., for metadata + streams + bitrate).
 pub fn get_media_streams(path: String) -> Result<MediaStreams, String> {
     let file_path = Path::new(&path);
-    if !file_path.exists() {
+
+    // Validate path is within allowed directories
+    let validated_path = config::validate_path(file_path)?;
+
+    if !validated_path.exists() {
         return Err("File does not exist".to_string());
     }
 
-    let ffprobe_cmd = find_command("ffprobe").unwrap_or_else(|| "ffprobe".to_string());
+    let file_size = fs::metadata(&validated_path).map(|m| m.len()).unwrap_or(0);
 
-    let file_size = fs::metadata(&file_path).map(|m| m.len()).unwrap_or(0);
-
-    let output = Command::new(&ffprobe_cmd)
-        .args([
-            "-v",
-            "quiet",
-            "-print_format",
-            "json",
-            "-show_streams",
-            "-show_format",
-            &path,
-        ])
-        .output()
-        .map_err(|e| format!("Failed to run ffprobe: {}", e))?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "ffprobe failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-
-    let json_str =
-        String::from_utf8(output.stdout).map_err(|e| format!("Invalid UTF-8 output: {}", e))?;
-
-    let data: serde_json::Value =
-        serde_json::from_str(&json_str).map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    // Use cached probe data to avoid redundant ffprobe calls
+    let (_, data, was_cached) = probe_cache::get_probe_data(&path)?;
+    debug!("get_media_streams: path={}, cached={}", path, was_cached);
 
     // Extract duration from format section
     let duration = data
@@ -367,7 +353,11 @@ pub fn remove_streams(
     overwrite: bool,
 ) -> Result<StreamRemovalResult, String> {
     let file_path = Path::new(&path);
-    if !file_path.exists() {
+
+    // Validate path is within allowed directories
+    let validated_path = config::validate_path(file_path)?;
+
+    if !validated_path.exists() {
         return Err("File does not exist".to_string());
     }
 
@@ -378,20 +368,20 @@ pub fn remove_streams(
     let ffmpeg_cmd = find_command("ffmpeg").unwrap_or_else(|| "ffmpeg".to_string());
 
     // Create output path - either temp file for overwrite or _modified suffix
-    let stem = file_path
+    let stem = validated_path
         .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("output");
-    let ext = file_path
+    let ext = validated_path
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("mkv");
-    let parent = file_path.parent().unwrap_or(Path::new("."));
+    let parent = validated_path.parent().unwrap_or(Path::new("."));
 
     let (output_path, temp_path) = if overwrite {
         // Use a temp file, then replace original
         let temp = parent.join(format!("{}_temp_{}.{}", stem, std::process::id(), ext));
-        (file_path.to_path_buf(), temp)
+        (validated_path.to_path_buf(), temp)
     } else {
         let modified = parent.join(format!("{}_modified.{}", stem, ext));
         (modified.clone(), modified)
@@ -441,11 +431,40 @@ pub fn remove_streams(
 
     // If overwriting, replace original with temp file
     if overwrite {
+        // Verify temp file exists and has reasonable size before replacing original
+        let temp_metadata = fs::metadata(&temp_path).map_err(|e| {
+            let _ = fs::remove_file(&temp_path);
+            format!("Failed to verify temp file: {}", e)
+        })?;
+
+        let temp_size = temp_metadata.len();
+        if temp_size == 0 {
+            let _ = fs::remove_file(&temp_path);
+            return Err("Temp file is empty - aborting to prevent data loss".to_string());
+        }
+
+        // Get original file size for comparison
+        let original_size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+
+        // Warn if temp file is suspiciously small compared to original (more than 90% smaller)
+        // This could indicate an incomplete write or encoding failure
+        if original_size > 0 && temp_size < original_size / 10 {
+            let _ = fs::remove_file(&temp_path);
+            return Err(format!(
+                "Temp file ({} bytes) is suspiciously smaller than original ({} bytes) - aborting to prevent data loss",
+                temp_size, original_size
+            ));
+        }
+
+        // All checks passed, safe to replace
         fs::remove_file(&path).map_err(|e| {
             let _ = fs::remove_file(&temp_path);
             format!("Failed to remove original file: {}", e)
         })?;
         fs::rename(&temp_path, &path).map_err(|e| format!("Failed to rename temp file: {}", e))?;
+
+        // Invalidate probe cache since the file has been modified
+        probe_cache::invalidate_cache(&path);
     }
 
     let final_message = if overwrite {
@@ -460,6 +479,11 @@ pub fn remove_streams(
             output_path.display()
         )
     };
+
+    // Also invalidate cache for the output path if it's different from the original
+    if !overwrite {
+        probe_cache::invalidate_cache(&output_path.to_string_lossy());
+    }
 
     Ok(StreamRemovalResult {
         success: true,

@@ -24,7 +24,7 @@ This document outlines the planned features and development milestones for Seer.
 - 🟢 New folder creation
 - 🟢 Reveal in Finder/Explorer
 - 🟢 Clipboard integration
-- 🟢 State management with zustand
+- 🟢 State management with Zustand
 - 🟢 Biome config for formatting/linting
 
 ### v0.3.0 - Media Analysis ✅
@@ -36,6 +36,8 @@ This document outlines the planned features and development milestones for Seer.
 - 🟢 SQLite database for caching and job tracking
 - 🟢 Export bitrate charts as PNG (theme-aware)
 - 🟢 Export bitrate data as JSON/CSV
+- 🟢 File metadata caching with hash-based validation
+- 🟢 Automatic cache invalidation on file changes
 - ⚪ Media file comparison tool
 - ⚪ Duplicate detection
 
@@ -70,6 +72,27 @@ This document outlines the planned features and development milestones for Seer.
 - ⚪ Automatic file organization rules
 - ⚪ Watch folders
 - ⚪ Integration with media servers (Plex, Jellyfin)
+
+## Technical Implementation Details
+
+### Caching Architecture
+
+The caching system uses SQLite with automatic invalidation:
+
+1. **File Hash Computation** (Rust backend)
+   - SHA-256 hash of: file size + mtime + first 8KB + last 8KB
+   - Fast computation even for large files
+
+2. **Cache Validation** (TypeScript frontend)
+   - Cache key format: `{cache_type}:{file_path}`
+   - On cache lookup, current file hash is compared with stored hash
+   - Mismatched hashes trigger automatic cache invalidation
+
+3. **Cache Types**
+   - `file_metadata` - File info + ffprobe data
+   - `bitrate_analysis` - Computed bitrate statistics
+   - `media_streams` - Parsed stream information
+   - `ffprobe_data` - Raw ffprobe output
 
 ## Future Considerations
 

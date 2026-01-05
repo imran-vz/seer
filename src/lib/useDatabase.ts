@@ -34,6 +34,11 @@ import {
 	startJob,
 	updateJob,
 } from "./database";
+import {
+	type CachedFileMetadata,
+	getFileMetadataCached,
+	invalidateFileMetadata,
+} from "./fileMetadataCache";
 
 // ============================================================================
 // Database Initialization Hook
@@ -41,7 +46,11 @@ import {
 
 /**
  * Hook to initialize the database on app startup
+ * Uses a module-level flag to prevent double initialization in React Strict Mode
  */
+let dbInitStarted = false;
+let dbInitPromise: Promise<void> | null = null;
+
 export function useInitDatabase(): {
 	initialized: boolean;
 	error: string | null;
@@ -50,7 +59,22 @@ export function useInitDatabase(): {
 	const [error, setError] = useState<string | null>(null);
 
 	useEffect(() => {
-		initDatabase()
+		// Prevent double initialization in React Strict Mode
+		if (dbInitStarted) {
+			// If already started, wait for the existing promise
+			if (dbInitPromise) {
+				dbInitPromise
+					.then(() => setInitialized(true))
+					.catch((err) => {
+						console.error("[useInitDatabase] Failed to initialize:", err);
+						setError(err instanceof Error ? err.message : String(err));
+					});
+			}
+			return;
+		}
+
+		dbInitStarted = true;
+		dbInitPromise = initDatabase()
 			.then(() => {
 				setInitialized(true);
 				// Run maintenance on startup
@@ -59,6 +83,7 @@ export function useInitDatabase(): {
 			.catch((err) => {
 				console.error("[useInitDatabase] Failed to initialize:", err);
 				setError(err instanceof Error ? err.message : String(err));
+				throw err; // Re-throw so the promise rejects
 			});
 	}, []);
 
@@ -355,5 +380,85 @@ export function useCachedData<T>(
 		saveToCache,
 		invalidate,
 		setData,
+	};
+}
+
+// ============================================================================
+// File Metadata Hook
+// ============================================================================
+
+/**
+ * Hook for fetching and caching file metadata
+ *
+ * Uses SQLite caching with file hash validation to ensure
+ * cached metadata stays in sync with the actual file on disk.
+ *
+ * @param filePath - The path to the file (or null for no file)
+ * @returns Object with metadata state and control functions
+ */
+export function useFileMetadata(filePath: string | null) {
+	const [metadata, setMetadata] = useState<CachedFileMetadata | null>(null);
+	const [loading, setLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const load = useCallback(
+		async (forceRefresh = false) => {
+			if (!filePath) {
+				setMetadata(null);
+				setError(null);
+				return null;
+			}
+
+			setLoading(true);
+			setError(null);
+
+			try {
+				const data = await getFileMetadataCached(filePath, {
+					forceRefresh,
+				});
+				setMetadata(data);
+				return data;
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err);
+				setError(message);
+				setMetadata(null);
+				return null;
+			} finally {
+				setLoading(false);
+			}
+		},
+		[filePath],
+	);
+
+	const refresh = useCallback(() => load(true), [load]);
+
+	const invalidate = useCallback(async () => {
+		if (!filePath) return;
+		await invalidateFileMetadata(filePath);
+		setMetadata(null);
+	}, [filePath]);
+
+	// Auto-load when filePath changes
+	useEffect(() => {
+		load();
+	}, [load]);
+
+	return {
+		/** The cached file metadata (null if not loaded) */
+		metadata,
+		/** Whether metadata is currently being loaded */
+		loading,
+		/** Error message if loading failed */
+		error,
+		/** Whether the current data came from cache */
+		fromCache: metadata?.from_cache ?? false,
+		/** When the cached data was created */
+		cachedAt: metadata?.cached_at ?? null,
+		/** Load metadata (uses cache if valid) */
+		load,
+		/** Force refresh from disk, ignoring cache */
+		refresh,
+		/** Invalidate the cache for this file */
+		invalidate,
 	};
 }

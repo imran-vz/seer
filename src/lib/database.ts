@@ -32,17 +32,28 @@ import {
 // ============================================================================
 
 let db: Database | null = null;
+let dbPromise: Promise<Database> | null = null;
 
 /**
  * Get the database instance, initializing if necessary
+ * Uses promise-based singleton to prevent race conditions
  * Note: Schema is created by Tauri migrations in Rust
  */
 export async function getDatabase(): Promise<Database> {
+	// Return existing connection
 	if (db) return db;
 
-	db = await Database.load(`sqlite:${DATABASE_NAME}`);
-	console.log("[Database] Connected to SQLite database");
-	return db;
+	// Return in-progress initialization promise to prevent race conditions
+	if (dbPromise) return dbPromise;
+
+	// Start initialization and store the promise
+	dbPromise = Database.load(`sqlite:${DATABASE_NAME}`).then((database) => {
+		db = database;
+		console.log("[Database] Connected to SQLite database");
+		return database;
+	});
+
+	return dbPromise;
 }
 
 /**
@@ -783,6 +794,7 @@ async function insertDataPointsBatch(
 	dataPoints: BitrateDataPoint[],
 ): Promise<void> {
 	const BATCH_SIZE = 500;
+	const FIELDS_PER_ROW = 4;
 
 	for (let i = 0; i < dataPoints.length; i += BATCH_SIZE) {
 		const batch = dataPoints.slice(i, i + BATCH_SIZE);
@@ -790,7 +802,7 @@ async function insertDataPointsBatch(
 		const values: unknown[] = [];
 
 		batch.forEach((point, idx) => {
-			const offset = idx * 4;
+			const offset = idx * FIELDS_PER_ROW;
 			placeholders.push(
 				`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`,
 			);
@@ -801,6 +813,14 @@ async function insertDataPointsBatch(
 				point.frame_type ?? null,
 			);
 		});
+
+		// Validate placeholder count matches values count
+		const expectedParams = batch.length * FIELDS_PER_ROW;
+		if (values.length !== expectedParams) {
+			throw new Error(
+				`Batch insert validation failed: expected ${expectedParams} values, got ${values.length}`,
+			);
+		}
 
 		await database.execute(
 			`INSERT INTO bitrate_data_points (analysis_id, timestamp, bitrate, frame_type)
@@ -819,6 +839,7 @@ async function insertStreamDataPointsBatch(
 	dataPoints: BitrateDataPoint[],
 ): Promise<void> {
 	const BATCH_SIZE = 500;
+	const FIELDS_PER_ROW = 4;
 
 	for (let i = 0; i < dataPoints.length; i += BATCH_SIZE) {
 		const batch = dataPoints.slice(i, i + BATCH_SIZE);
@@ -826,7 +847,7 @@ async function insertStreamDataPointsBatch(
 		const values: unknown[] = [];
 
 		batch.forEach((point, idx) => {
-			const offset = idx * 4;
+			const offset = idx * FIELDS_PER_ROW;
 			placeholders.push(
 				`($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4})`,
 			);
@@ -837,6 +858,14 @@ async function insertStreamDataPointsBatch(
 				point.frame_type ?? null,
 			);
 		});
+
+		// Validate placeholder count matches values count
+		const expectedParams = batch.length * FIELDS_PER_ROW;
+		if (values.length !== expectedParams) {
+			throw new Error(
+				`Batch insert validation failed: expected ${expectedParams} values, got ${values.length}`,
+			);
+		}
 
 		await database.execute(
 			`INSERT INTO stream_data_points (contribution_id, timestamp, bitrate, frame_type)

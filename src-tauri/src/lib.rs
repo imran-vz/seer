@@ -6,8 +6,10 @@
 // Module declarations
 pub mod bitrate;
 pub mod commands;
+pub mod config;
 pub mod database;
 pub mod files;
+pub mod jobs;
 pub mod media;
 pub mod types;
 pub mod window;
@@ -31,12 +33,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(
             tauri_plugin_log::Builder::new()
-                .target(tauri_plugin_log::Target::new(
-                    tauri_plugin_log::TargetKind::Stdout,
-                ))
-                .target(tauri_plugin_log::Target::new(
-                    tauri_plugin_log::TargetKind::Webview,
-                ))
+                .targets([
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                    tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+                        file_name: Some("seer.log".to_string()),
+                    }),
+                ])
                 .level(log::LevelFilter::Debug)
                 .build(),
         )

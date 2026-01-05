@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
 import {
 	AlertDialog,
@@ -15,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFileBrowserStore } from "@/stores/fileBrowserStore";
+import type { QueueStatus } from "@/types/bitrate";
 
 type StreamType =
 	| "video"
@@ -254,9 +256,11 @@ function StreamCard({
 								: stream.stream_type.charAt(0).toUpperCase() +
 									stream.stream_type.slice(1)}
 						</Badge>
-						<span className="font-medium text-sm">
-							#{stream.index} • {getLanguageName(stream.language)}
-						</span>
+						{stream.stream_type !== "video" && (
+							<span className="font-medium text-sm">
+								#{stream.index} • {getLanguageName(stream.language)}
+							</span>
+						)}
 						{stream.estimated_size && (
 							<span className="text-muted-foreground text-xs">
 								({formatSize(stream.estimated_size)})
@@ -340,6 +344,18 @@ export function StreamsPanel({ filePath }: StreamsPanelProps) {
 	const [removing, setRemoving] = useState(false);
 	const [result, setResult] = useState<StreamRemovalResult | null>(null);
 	const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+	const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
+
+	// Listen for queue updates
+	useEffect(() => {
+		const unlisten = listen<QueueStatus>("job-queue-update", (event) => {
+			setQueueStatus(event.payload);
+		});
+
+		return () => {
+			unlisten.then((fn) => fn());
+		};
+	}, []);
 
 	useEffect(() => {
 		if (!filePath) {
@@ -404,7 +420,17 @@ export function StreamsPanel({ filePath }: StreamsPanelProps) {
 			setMediaStreams(data);
 			refresh();
 		} catch (e) {
-			setError(String(e));
+			const errorMessage = String(e);
+			// Don't show error if job was queued or already exists
+			if (
+				errorMessage.includes("already queued") ||
+				errorMessage.includes("already in progress")
+			) {
+				console.log("[StreamsPanel] Job queued or already running");
+				// Keep removing state to show progress
+			} else {
+				setError(errorMessage);
+			}
 		} finally {
 			setRemoving(false);
 		}
@@ -438,6 +464,18 @@ export function StreamsPanel({ filePath }: StreamsPanelProps) {
 	const clearSelection = () => {
 		setSelectedStreams(new Set());
 	};
+
+	// Check if there's a stream removal job for this file
+	const streamRemovalJob =
+		queueStatus?.queued.find(
+			(job) => job.path === filePath && job.state.includes("stream_removal"),
+		) ||
+		queueStatus?.running.find(
+			(job) => job.path === filePath && job.state.includes("stream_removal"),
+		);
+
+	const isJobQueued = streamRemovalJob?.state.startsWith("queued:");
+	const isJobRunning = streamRemovalJob?.state.startsWith("running:");
 
 	if (!filePath) {
 		return (
@@ -509,6 +547,42 @@ export function StreamsPanel({ filePath }: StreamsPanelProps) {
 					{result && (
 						<div className="mb-4 rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-green-700 dark:text-green-400">
 							<p className="font-medium text-sm">✓ {result.message}</p>
+						</div>
+					)}
+
+					{isJobQueued && (
+						<div className="mb-4 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-blue-700 dark:text-blue-400">
+							<p className="font-medium text-sm">
+								⏳ Stream removal queued - waiting for available slot
+							</p>
+						</div>
+					)}
+
+					{isJobRunning && (
+						<div className="mb-4 rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-blue-700 dark:text-blue-400">
+							<div className="flex items-center justify-between">
+								<p className="font-medium text-sm">
+									🔄 {streamRemovalJob?.progress_stage || "Removing streams..."}
+								</p>
+								{streamRemovalJob?.progress_percentage !== undefined && (
+									<span className="text-xs">
+										{streamRemovalJob.progress_percentage.toFixed(0)}%
+									</span>
+								)}
+							</div>
+							{streamRemovalJob?.progress_percentage !== undefined && (
+								<div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-blue-500/20">
+									<div
+										className="h-full bg-blue-500 transition-all"
+										style={{
+											width: `${streamRemovalJob.progress_percentage}%`,
+										}}
+									/>
+								</div>
+							)}
+							<p className="mt-1 text-xs opacity-75">
+								Running for {streamRemovalJob?.running_seconds?.toFixed(1)}s
+							</p>
 						</div>
 					)}
 

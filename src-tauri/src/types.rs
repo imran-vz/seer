@@ -123,6 +123,21 @@ pub struct BitrateProgress {
     pub total: usize,
     pub percentage: f64,
     pub stage: String,
+    /// Estimated seconds remaining (if calculable)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub eta_seconds: Option<f64>,
+    /// Elapsed seconds since analysis started
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub elapsed_seconds: Option<f64>,
+    /// Whether sampling mode is being used (for large files)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub using_sampling: Option<bool>,
+    /// Number of streams being analyzed
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_count: Option<usize>,
+    /// Current stream being analyzed (1-indexed)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_stream: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,6 +206,10 @@ pub struct JobInfo {
     pub state: String,
     pub queued_seconds: Option<f64>,
     pub running_seconds: Option<f64>,
+    pub progress_current: Option<usize>,
+    pub progress_total: Option<usize>,
+    pub progress_percentage: Option<f64>,
+    pub progress_stage: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

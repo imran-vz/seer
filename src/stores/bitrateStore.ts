@@ -162,13 +162,21 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 		}
 
 		console.log(`[BitrateStore] Starting overall analysis: ${path}`);
+		console.log(`[BitrateStore] Current state:`, {
+			currentJobPath,
+			intervalSeconds,
+			providedFileHash,
+		});
 		set({ loading: true, error: null, currentJobPath: path });
 
 		try {
 			// Compute file hash using backend if not provided
+			console.log("[BitrateStore] Computing file hash...");
 			const fileHash = providedFileHash || (await computeFileHash(path));
+			console.log("[BitrateStore] File hash:", fileHash);
 
 			// Check database cache first
+			console.log("[BitrateStore] Checking database cache...");
 			const cached = await getBitrateAnalysis(path, fileHash);
 			if (cached) {
 				console.log("[BitrateStore] Returning cached analysis from database");
@@ -179,15 +187,45 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 				});
 				return;
 			}
+			console.log("[BitrateStore] No cache hit, calling backend...");
 
 			// No cache hit, perform analysis via backend
-			const result = await invoke<OverallBitrateAnalysis>(
+			console.log("[BitrateStore] Invoking analyze_overall_bitrate command...");
+
+			// Add a timeout wrapper to detect hanging invokes
+			const timeoutMs = 300000; // 5 minutes
+			const invokePromise = invoke<OverallBitrateAnalysis>(
 				"analyze_overall_bitrate",
 				{
 					path,
 					intervalSeconds,
 				},
 			);
+
+			// Log every 10 seconds while waiting
+			const intervalId = setInterval(() => {
+				console.log("[BitrateStore] Still waiting for backend response...");
+			}, 10000);
+
+			let result: OverallBitrateAnalysis;
+			try {
+				result = await Promise.race([
+					invokePromise,
+					new Promise<never>((_, reject) =>
+						setTimeout(
+							() =>
+								reject(
+									new Error(`Analysis timed out after ${timeoutMs / 1000}s`),
+								),
+							timeoutMs,
+						),
+					),
+				]);
+			} finally {
+				clearInterval(intervalId);
+			}
+
+			console.log("[BitrateStore] Backend returned result");
 
 			console.log(
 				"[BitrateStore] Overall analysis complete:",
@@ -216,23 +254,31 @@ export const useBitrateStore = create<BitrateState>((set, get) => ({
 			});
 		} catch (error) {
 			console.error("[BitrateStore] Overall analysis error:", error);
+			console.error("[BitrateStore] Error type:", typeof error);
+			console.error(
+				"[BitrateStore] Error details:",
+				JSON.stringify(error, null, 2),
+			);
 			const errorMessage =
 				error instanceof Error ? error.message : String(error);
+			console.log("[BitrateStore] Error message:", errorMessage);
 
 			// Don't show error if it was a cancellation
 			if (errorMessage.includes("cancelled")) {
 				set({ loading: false, currentJobPath: null });
 			}
 			// If already queued/running, keep loading state to show progress
+			// The job is still running and will emit progress events
 			else if (
 				errorMessage.includes("already queued") ||
 				errorMessage.includes("already in progress")
 			) {
 				console.log(
-					"[BitrateStore] Job already queued/running, showing existing progress",
+					"[BitrateStore] Job already queued/running, keeping loading state to show progress",
 				);
 				// Keep loading: true and currentJobPath set so progress events are displayed
-				// Don't set error - this is expected behavior
+				// Don't set error - this is expected behavior when switching back to a file
+				// that's still being analyzed
 			} else {
 				set({
 					error: errorMessage,

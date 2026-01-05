@@ -42,7 +42,7 @@ const defaultSettings: AppSettings = {
 	cacheExpirationDays: 30,
 
 	// Performance settings
-	maxParallelJobs: 2,
+	maxParallelJobs: 4,
 };
 
 // Map frontend setting keys to database keys
@@ -75,6 +75,7 @@ interface SettingsState {
 	settings: AppSettings;
 	loading: boolean;
 	initialized: boolean;
+	initializing: boolean;
 	error: string | null;
 
 	// Actions
@@ -97,12 +98,22 @@ interface SettingsState {
 }
 
 let db: Database | null = null;
+let dbPromise: Promise<Database> | null = null;
 
 async function getDatabase(): Promise<Database> {
-	if (!db) {
-		db = await Database.load("sqlite:seer.db");
-	}
-	return db;
+	// Return existing connection
+	if (db) return db;
+
+	// Return in-progress initialization promise to prevent race conditions
+	if (dbPromise) return dbPromise;
+
+	// Start initialization and store the promise
+	dbPromise = Database.load("sqlite:seer.db").then((database) => {
+		db = database;
+		return database;
+	});
+
+	return dbPromise;
 }
 
 // Convert value to database string format
@@ -134,12 +145,16 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 	settings: defaultSettings,
 	loading: false,
 	initialized: false,
+	initializing: false,
 	error: null,
 
 	initialize: async () => {
-		if (get().initialized) return;
+		// Prevent double initialization - check both flags
+		const state = get();
+		if (state.initialized || state.initializing) return;
 
-		set({ loading: true, error: null });
+		// Set initializing flag immediately to prevent race conditions
+		set({ initializing: true, loading: true, error: null });
 		try {
 			const database = await getDatabase();
 
@@ -149,13 +164,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 			);
 
 			const loadedSettings = { ...defaultSettings };
+			console.log(
+				"[SettingsStore] Loading settings from DB, found rows:",
+				rows,
+			);
 			for (const row of rows) {
 				const frontendKey = reverseKeyMap[row.key];
 				if (frontendKey) {
+					const value = dbToValue(frontendKey, row.value);
+
 					// Use type assertion since we know the keys match
-					(loadedSettings as Record<string, unknown>)[frontendKey] = dbToValue(
-						frontendKey,
-						row.value,
+					(loadedSettings as Record<string, unknown>)[frontendKey] = value;
+					console.log(
+						`[SettingsStore] Loaded ${frontendKey} = ${JSON.stringify(value)} (from DB: ${row.value})`,
 					);
 				}
 			}
@@ -164,15 +185,20 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 				settings: loadedSettings,
 				loading: false,
 				initialized: true,
+				initializing: false,
 			});
 
-			console.log("[SettingsStore] Settings loaded from database");
+			console.log(
+				"[SettingsStore] Settings loaded from database:",
+				loadedSettings,
+			);
 		} catch (error) {
 			console.error("[SettingsStore] Failed to initialize:", error);
 			set({
 				error: error instanceof Error ? error.message : String(error),
 				loading: false,
 				initialized: true, // Mark as initialized even on error to prevent infinite retries
+				initializing: false,
 			});
 		}
 	},
@@ -281,7 +307,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 	},
 
 	setLastDirectory: async (path) => {
+		console.log("[SettingsStore] setLastDirectory called with:", path);
 		await get().updateSetting("lastDirectory", path);
+		console.log(
+			"[SettingsStore] lastDirectory updated, current value:",
+			get().settings.lastDirectory,
+		);
 	},
 
 	validatePath: async (path, createIfMissing = false) => {

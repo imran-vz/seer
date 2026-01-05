@@ -1,17 +1,9 @@
-import { invoke } from "@tauri-apps/api/core";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-interface FileMetadata {
-	path: string;
-	name: string;
-	size: number;
-	modified: string | null;
-	created: string | null;
-	is_media: boolean;
-	extension: string | null;
-	ffprobe_data: string | null;
-}
+import {
+	type CachedFileMetadata,
+	getFileMetadataCached,
+} from "@/lib/fileMetadataCache";
 
 interface FFProbeFormat {
 	filename?: string;
@@ -80,26 +72,35 @@ function MetadataRow({
 }
 
 export function MetadataPanel({ filePath }: MetadataPanelProps) {
-	const [metadata, setMetadata] = useState<FileMetadata | null>(null);
+	const [metadata, setMetadata] = useState<CachedFileMetadata | null>(null);
 	const [ffprobe, setFfprobe] = useState<FFProbeData | null>(null);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [fromCache, setFromCache] = useState(false);
 
-	useEffect(() => {
-		if (!filePath) {
-			setMetadata(null);
-			setFfprobe(null);
-			return;
-		}
+	const loadMetadata = useCallback(
+		async (forceRefresh = false) => {
+			if (!filePath) {
+				setMetadata(null);
+				setFfprobe(null);
+				setFromCache(false);
+				return;
+			}
 
-		const loadMetadata = async () => {
 			setLoading(true);
 			setError(null);
+
 			try {
-				const data = await invoke<FileMetadata>("get_file_metadata", {
-					path: filePath,
+				// Use cached metadata with hash validation
+				// The cache will automatically validate that the file hasn't changed
+				// by comparing the stored hash with the current file's hash
+				const data = await getFileMetadataCached(filePath, {
+					forceRefresh,
 				});
+
 				setMetadata(data);
+				setFromCache(data.from_cache);
+
 				if (data.ffprobe_data) {
 					try {
 						setFfprobe(JSON.parse(data.ffprobe_data));
@@ -111,13 +112,19 @@ export function MetadataPanel({ filePath }: MetadataPanelProps) {
 				}
 			} catch (e) {
 				setError(String(e));
+				setMetadata(null);
+				setFfprobe(null);
+				setFromCache(false);
 			} finally {
 				setLoading(false);
 			}
-		};
+		},
+		[filePath],
+	);
 
+	useEffect(() => {
 		loadMetadata();
-	}, [filePath]);
+	}, [loadMetadata]);
 
 	const formatSize = (bytes: number): string => {
 		const units = ["B", "KB", "MB", "GB"];
@@ -164,9 +171,29 @@ export function MetadataPanel({ filePath }: MetadataPanelProps) {
 	return (
 		<ScrollArea className="h-full">
 			<div className="p-4">
-				<h2 className="mb-4 break-all font-semibold text-lg">
-					{metadata.name}
-				</h2>
+				<div className="mb-4 flex items-start justify-between gap-2">
+					<h2 className="break-all font-semibold text-lg">{metadata.name}</h2>
+					{fromCache && (
+						<button
+							type="button"
+							onClick={() => loadMetadata(true)}
+							className="shrink-0 rounded px-2 py-1 text-muted-foreground text-xs hover:bg-muted hover:text-foreground"
+							title="Refresh metadata from disk"
+						>
+							↻ Refresh
+						</button>
+					)}
+				</div>
+
+				{fromCache && metadata.cached_at && (
+					<div className="mb-4 rounded border border-border bg-muted/50 px-3 py-2 text-muted-foreground text-xs">
+						Cached{" "}
+						{new Date(metadata.cached_at).toLocaleString(undefined, {
+							dateStyle: "short",
+							timeStyle: "short",
+						})}
+					</div>
+				)}
 
 				<MetadataSection title="File Info">
 					<MetadataRow label="Size" value={formatSize(metadata.size)} />

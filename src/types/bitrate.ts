@@ -13,9 +13,13 @@ export interface JobStatus {
 export interface JobInfo {
 	job_id: number;
 	path: string;
-	state: "queued" | "running";
+	state: string; // Format: "queued:job_type" or "running:job_type" (e.g., "queued:bitrate_analysis", "running:stream_removal")
 	queued_seconds?: number;
 	running_seconds?: number;
+	progress_current?: number;
+	progress_total?: number;
+	progress_percentage?: number;
+	progress_stage?: string;
 }
 
 export interface QueueStatus {

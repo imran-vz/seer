@@ -9,6 +9,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useBitrateStore } from "@/stores/bitrateStore";
+import { useFileBrowserStore } from "@/stores/fileBrowserStore";
 import type { JobInfo } from "@/types/bitrate";
 
 interface DisplayJob extends JobInfo {
@@ -18,6 +19,7 @@ interface DisplayJob extends JobInfo {
 
 export function JobIndicator() {
 	const { queueStatus, cancelAnalysis, cancelAllJobs } = useBitrateStore();
+	const navigateToFile = useFileBrowserStore((state) => state.navigateToFile);
 
 	if (!queueStatus) {
 		return null;
@@ -46,6 +48,10 @@ export function JobIndicator() {
 
 	const handleCancelJob = async (job: DisplayJob) => {
 		await cancelAnalysis(job.path);
+	};
+
+	const handleJobClick = async (job: DisplayJob) => {
+		await navigateToFile(job.path);
 	};
 
 	const handleCancelAll = async () => {
@@ -90,8 +96,8 @@ export function JobIndicator() {
 				{displayJobs.map((job) => (
 					<DropdownMenuItem
 						key={job.path}
-						className="flex items-center justify-between gap-2"
-						onSelect={(e) => e.preventDefault()}
+						className="flex cursor-pointer items-center justify-between gap-2"
+						onSelect={() => handleJobClick(job)}
 					>
 						<div className="flex min-w-0 flex-1 flex-col gap-0.5">
 							<span className="truncate font-medium text-xs">
@@ -115,7 +121,10 @@ export function JobIndicator() {
 							variant="ghost"
 							size="icon-sm"
 							className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive"
-							onClick={() => handleCancelJob(job)}
+							onClick={(e) => {
+								e.stopPropagation();
+								handleCancelJob(job);
+							}}
 							title="Cancel job"
 						>
 							<X className="h-3 w-3" />

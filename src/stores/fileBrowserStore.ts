@@ -25,6 +25,7 @@ interface FileBrowserState {
 	error: string | null;
 	loading: boolean;
 	initialized: boolean;
+	initializing: boolean;
 
 	// Actions
 	setCurrentPath: (path: string) => void;
@@ -34,6 +35,7 @@ interface FileBrowserState {
 	goUp: () => Promise<void>;
 	navigate: (entry: FileEntry) => Promise<void>;
 	selectFile: (entry: FileEntry) => void;
+	navigateToFile: (filePath: string) => Promise<void>;
 	initialize: () => Promise<void>;
 
 	// Bulk selection
@@ -73,6 +75,7 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
 	error: null,
 	loading: false,
 	initialized: false,
+	initializing: false,
 
 	setCurrentPath: (path) => set({ currentPath: path }),
 
@@ -87,11 +90,23 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
 			// Save last directory to settings if enabled
 			if (saveToSettings) {
 				const settingsStore = useSettingsStore.getState();
+				console.log(
+					"[FileBrowser] Checking if should save last directory:",
+					path,
+					{
+						startInLastDirectory: settingsStore.settings.startInLastDirectory,
+					},
+				);
 				if (settingsStore.settings.startInLastDirectory) {
+					console.log("[FileBrowser] Saving last directory:", path);
 					// Don't await this - let it happen in the background
 					settingsStore.setLastDirectory(path).catch((err) => {
 						console.warn("[FileBrowser] Failed to save last directory:", err);
 					});
+				} else {
+					console.log(
+						"[FileBrowser] Not saving - startInLastDirectory is false",
+					);
 				}
 			}
 		} catch (e) {
@@ -125,9 +140,30 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
 		}
 	},
 
+	navigateToFile: async (filePath: string) => {
+		const { currentPath, loadDirectory } = get();
+		// Extract the parent directory from the file path
+		const lastSlashIndex = filePath.lastIndexOf("/");
+		if (lastSlashIndex === -1) return;
+
+		const parentDir = filePath.substring(0, lastSlashIndex) || "/";
+
+		// If we're not already in the parent directory, navigate to it
+		if (currentPath !== parentDir) {
+			await loadDirectory(parentDir);
+		}
+
+		// Select the file
+		set({ selectedPath: filePath });
+	},
+
 	initialize: async () => {
-		// Prevent double initialization
-		if (get().initialized) return;
+		// Prevent double initialization - check both flags
+		const state = get();
+		if (state.initialized || state.initializing) return;
+
+		// Set initializing flag immediately to prevent race conditions
+		set({ initializing: true });
 
 		const { loadDirectory } = get();
 
@@ -136,11 +172,21 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
 			const settingsStore = useSettingsStore.getState();
 			await settingsStore.initialize();
 
-			const { settings } = settingsStore;
+			// Re-fetch state after initialization to get updated settings
+			const { settings } = useSettingsStore.getState();
 			let initialPath: string | null = null;
+
+			console.log("[FileBrowser] Settings loaded:", {
+				startInLastDirectory: settings.startInLastDirectory,
+				lastDirectory: settings.lastDirectory,
+			});
 
 			// Check if we should use the last directory
 			if (settings.startInLastDirectory && settings.lastDirectory) {
+				console.log(
+					"[FileBrowser] Attempting to use last directory:",
+					settings.lastDirectory,
+				);
 				// Validate the last directory still exists
 				try {
 					const result = await invoke<{ valid: boolean; exists: boolean }>(
@@ -151,29 +197,43 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
 						},
 					);
 
+					console.log("[FileBrowser] Validation result:", result);
+
 					if (result.valid && result.exists) {
 						initialPath = settings.lastDirectory;
 						console.log(
 							"[FileBrowser] Using last directory:",
 							settings.lastDirectory,
 						);
+					} else {
+						console.log(
+							"[FileBrowser] Last directory invalid or doesn't exist",
+						);
 					}
 				} catch (err) {
 					console.warn("[FileBrowser] Failed to validate last directory:", err);
 				}
+			} else {
+				console.log(
+					"[FileBrowser] Not using last directory:",
+					!settings.startInLastDirectory
+						? "startInLastDirectory is false"
+						: "lastDirectory is empty",
+				);
 			}
 
+			console.log(initialPath);
 			// Fall back to home directory if no valid last directory
 			if (!initialPath) {
 				initialPath = await invoke<string>("get_home_dir");
 				console.log("[FileBrowser] Using home directory:", initialPath);
 			}
 
-			set({ initialized: true });
+			set({ initialized: true, initializing: false });
 			await loadDirectory(initialPath, false); // Don't save initial load
 		} catch (e) {
 			console.error("[FileBrowser] Initialization error:", e);
-			set({ error: String(e), initialized: true });
+			set({ error: String(e), initialized: true, initializing: false });
 
 			// Try to at least load the home directory as fallback
 			try {

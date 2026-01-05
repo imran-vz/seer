@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#0a0a0b">
-    <meta name="description" content="Seer is a free, open-source desktop application for media file management, metadata editing, audio codec detection, batch re-encoding, and file organization. Available for macOS, Windows, and Linux.">
+    <meta name="description" content="Seer is a free, open-source desktop application for media file management, metadata editing, codec detection, bitrate analysis, and smart caching. Features SQLite-based metadata caching with hash validation. Available for macOS, Windows, and Linux.">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Seer - Free Media File Manager & Metadata Editor | Desktop App</title>
 
     <!-- SEO Meta Tags -->
-    <meta name="keywords" content="media file manager, metadata editor, audio codec detection, video re-encoding, file organization, batch processing, ffmpeg, desktop app, open source, free software, macOS, Windows, Linux">
+    <meta name="keywords" content="media file manager, metadata editor, audio codec detection, video re-encoding, bitrate analysis, file organization, batch processing, ffmpeg, ffprobe, sqlite caching, desktop app, open source, free software, macOS, Windows, Linux, tauri, rust">
     <meta name="author" content="Imran">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
     <meta name="googlebot" content="index, follow">
@@ -20,7 +20,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://seer.imran.codes/">
     <meta property="og:title" content="Seer - Free Media File Manager & Metadata Editor">
-    <meta property="og:description" content="A powerful open-source desktop app for media file management, metadata editing, audio codec detection, and intelligent re-encoding. Available for macOS, Windows, and Linux.">
+    <meta property="og:description" content="A powerful open-source desktop app for media file management, metadata viewing, bitrate analysis, and smart caching with hash-based validation. Available for macOS, Windows, and Linux.">
     <meta property="og:image" content="https://seer.imran.codes/seer-logo.png">
     <meta property="og:image:alt" content="Seer application logo">
     <meta property="og:site_name" content="Seer">
@@ -30,7 +30,7 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:url" content="https://seer.imran.codes/">
     <meta name="twitter:title" content="Seer - Free Media File Manager & Metadata Editor">
-    <meta name="twitter:description" content="A powerful open-source desktop app for media file management, metadata editing, audio codec detection, and intelligent re-encoding.">
+    <meta name="twitter:description" content="A powerful open-source desktop app for media file management, metadata viewing, bitrate analysis, and smart caching with hash-based validation.">
     <meta name="twitter:image" content="https://seer.imran.codes/seer-logo.png">
     <meta name="twitter:image:alt" content="Seer application logo">
 
@@ -41,7 +41,7 @@
         "@type": "SoftwareApplication",
         "name": "Seer",
         "alternateName": "சீர்",
-        "description": "A powerful desktop application for media file management, metadata editing, audio codec detection, and intelligent re-encoding.",
+        "description": "A powerful desktop application for media file management, metadata viewing, bitrate analysis, stream management, and smart SQLite caching with hash-based validation.",
         "url": "https://seer.imran.codes/",
         "applicationCategory": "MultimediaApplication",
         "operatingSystem": ["macOS", "Windows", "Linux"],
@@ -65,7 +65,8 @@
             "Bitrate analysis with interactive graphs",
             "Export bitrate charts as PNG or data as JSON/CSV",
             "Stream management and removal",
-            "SQLite caching for job tracking",
+            "Smart SQLite caching with hash-based validation",
+            "File metadata caching with automatic invalidation",
             "Cross-platform support (macOS, Windows, Linux)"
         ]
     }
@@ -302,7 +303,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-music-icon lucide-file-music"><path d="M11.65 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v10.35"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/><path d="M8 20v-7l3 1.474"/><circle cx="6" cy="20" r="2"/></svg>
                         </div>
                         <h3>Media Analysis</h3>
-                        <p>View detailed codec information and stream analysis for video, audio, subtitles, and attachments. Powered by FFprobe.</p>
+                        <p>View detailed codec information and stream analysis for video, audio, subtitles, and attachments. Powered by FFprobe with intelligent caching.</p>
                     </article>
 
                     <article class="feature-card">
@@ -319,6 +320,14 @@
                         </div>
                         <h3>Bitrate Analysis</h3>
                         <p>Interactive bitrate graphs with per-stream visualization, detailed statistics, and peak detection for comprehensive media analysis.</p>
+                    </article>
+
+                    <article class="feature-card">
+                        <div class="feature-icon" aria-hidden="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-database-icon lucide-database"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></svg>
+                        </div>
+                        <h3>Smart Caching</h3>
+                        <p>SQLite-based caching with hash validation ensures instant access to file metadata while automatically invalidating when files change.</p>
                     </article>
 
                     <article class="feature-card">
@@ -495,7 +504,7 @@
                 </nav>
             </div>
             <div class="footer-bottom">
-                <p>&copy; 2026 Seer. Released under MIT License.</p>
+                <p>&copy; 2025 Seer. Released under MIT License.</p>
             </div>
         </div>
     </footer>

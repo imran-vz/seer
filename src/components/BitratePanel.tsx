@@ -1,5 +1,4 @@
 import { listen } from "@tauri-apps/api/event";
-import { stat } from "@tauri-apps/plugin-fs";
 import { useEffect, useRef, useState } from "react";
 import {
 	AlertDialog,
@@ -23,6 +22,16 @@ interface BitrateProgress {
 	total: number;
 	percentage: number;
 	stage: string;
+	/** Estimated seconds remaining */
+	eta_seconds?: number;
+	/** Elapsed seconds since analysis started */
+	elapsed_seconds?: number;
+	/** Whether sampling mode is being used (for large files) */
+	using_sampling?: boolean;
+	/** Number of streams being analyzed */
+	stream_count?: number;
+	/** Current stream being analyzed (1-indexed) */
+	current_stream?: number;
 }
 
 interface BitratePanelProps {
@@ -37,6 +46,7 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 		analysisMode,
 		selectedStreamIndex,
 		currentJobPath,
+		queueStatus,
 		analyzeOverall,
 		forceAnalyze,
 		cancelAnalysis,
@@ -44,14 +54,12 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 		exportData,
 		cacheStats,
 		refreshCacheStats,
-		computeFileHash,
 	} = useBitrateStore();
 
 	const chartRef = useRef<BitrateChartHandle>(null);
 	const [progress, setProgress] = useState<BitrateProgress | null>(null);
 	const [showWarning, setShowWarning] = useState(false);
 	const [pendingPath, setPendingPath] = useState<string | null>(null);
-	const [pendingHash, setPendingHash] = useState<string | null>(null);
 	const [lastAnalyzedPath, setLastAnalyzedPath] = useState<string | null>(null);
 
 	// Refresh cache stats on mount
@@ -59,7 +67,41 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 		refreshCacheStats();
 	}, [refreshCacheStats]);
 
+	// Restore progress from queue status when switching files
+	// This handles the case where we switch back to a file that's still being analyzed
 	useEffect(() => {
+		if (!filePath || !queueStatus) return;
+
+		// Find any job for this file path
+		const job =
+			queueStatus.queued.find(
+				(j) => j.path === filePath && j.state.includes("bitrate_analysis"),
+			) ||
+			queueStatus.running.find(
+				(j) => j.path === filePath && j.state.includes("bitrate_analysis"),
+			);
+
+		if (job) {
+			// There's an active job for this file - restore progress
+			console.log("[BitratePanel] Found active job for file:", job);
+			if (job.progress_stage) {
+				setProgress({
+					current: job.progress_current || 0,
+					total: job.progress_total || 100,
+					percentage: job.progress_percentage || 0,
+					stage: job.progress_stage,
+				});
+			}
+			// Mark this file as being analyzed so we don't try to start another job
+			setLastAnalyzedPath(filePath);
+		} else if (!loading) {
+			// Clear progress if no job and not loading
+			setProgress(null);
+		}
+	}, [filePath, queueStatus, loading]);
+
+	useEffect(() => {
+		console.log("[BitratePanel] Setting up progress event listener");
 		// Listen for progress events
 		const unlisten = listen<BitrateProgress>("bitrate-progress", (event) => {
 			console.log("[BitratePanel] Progress update:", event.payload);
@@ -67,21 +109,45 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 		});
 
 		return () => {
+			console.log("[BitratePanel] Cleaning up progress event listener");
 			unlisten.then((fn) => fn());
 		};
 	}, []);
 
 	useEffect(() => {
+		// Check if there's already a running job for this file in the queue
+		const hasRunningJob =
+			queueStatus?.running.some(
+				(j) => j.path === filePath && j.state.includes("bitrate_analysis"),
+			) ||
+			queueStatus?.queued.some(
+				(j) => j.path === filePath && j.state.includes("bitrate_analysis"),
+			);
+
 		// Check if we need to analyze a new file
 		// Allow starting analysis if:
 		// 1. We have a file path
 		// 2. It's different from the last analyzed path
 		// 3. Either not loading, OR loading a different file (allows switching while bg job runs)
+		// 4. There's no already running job for this file
 		const isLoadingDifferentFile = loading && currentJobPath !== filePath;
 		const canStartAnalysis =
 			filePath &&
 			filePath !== lastAnalyzedPath &&
+			!hasRunningJob &&
 			(!loading || isLoadingDifferentFile);
+
+		console.log("[BitratePanel] Analysis check:", {
+			filePath,
+			lastAnalyzedPath,
+			loading,
+			currentJobPath,
+			isLoadingDifferentFile,
+			hasRunningJob,
+			canStartAnalysis,
+			hasCurrentAnalysis: !!currentAnalysis,
+			currentAnalysisPath: currentAnalysis?.path,
+		});
 
 		if (canStartAnalysis) {
 			// Clear previous analysis if it's for a different file
@@ -91,33 +157,19 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 				setProgress(null);
 			}
 
-			// Get file stats and compute hash
-			stat(filePath)
-				.then(async (fileStat) => {
-					// Use the store's computeFileHash which calls the backend
-					const fileHash = await computeFileHash(filePath);
-					const sizeGB = fileStat.size / (1024 * 1024 * 1024);
+			// Mark this path as being analyzed to prevent re-triggering
+			setLastAnalyzedPath(filePath);
+			console.log("[BitratePanel] Starting analysis for:", filePath);
 
-					if (sizeGB > 1) {
-						// Show warning for files > 1GB
-						setPendingPath(filePath);
-						setPendingHash(fileHash);
-						setShowWarning(true);
-					} else {
-						setLastAnalyzedPath(filePath);
-						analyzeOverall(filePath, fileHash);
-					}
-				})
-				.catch(() => {
-					// If we can't get file stats, just analyze without hash
-					setLastAnalyzedPath(filePath);
-					analyzeOverall(filePath);
-				});
+			// Start analysis - the store will handle file hash computation
+			// We don't use stat() from frontend due to permission issues with arbitrary paths
+			analyzeOverall(filePath).catch((err) => {
+				console.error("[BitratePanel] Analysis failed:", err);
+			});
 		} else if (!filePath) {
 			clearAnalysis();
 			setProgress(null);
 			setPendingPath(null);
-			setPendingHash(null);
 			setLastAnalyzedPath(null);
 		}
 	}, [
@@ -128,23 +180,21 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 		currentAnalysis,
 		analyzeOverall,
 		clearAnalysis,
-		computeFileHash,
+		queueStatus,
 	]);
 
 	const handleConfirmAnalysis = () => {
 		if (pendingPath) {
 			setLastAnalyzedPath(pendingPath);
-			analyzeOverall(pendingPath, pendingHash ?? undefined);
+			analyzeOverall(pendingPath);
 			setShowWarning(false);
 			setPendingPath(null);
-			setPendingHash(null);
 		}
 	};
 
 	const handleCancelAnalysis = () => {
 		setShowWarning(false);
 		setPendingPath(null);
-		setPendingHash(null);
 	};
 
 	const handleExportPng = () => {
@@ -157,8 +207,30 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 	const analysisMatchesFile =
 		currentAnalysis && filePath && currentAnalysis.path === filePath;
 
+	// Check if there's a running/queued job for this file
+	const hasActiveJobForFile =
+		queueStatus?.running.some(
+			(j) => j.path === filePath && j.state.includes("bitrate_analysis"),
+		) ||
+		queueStatus?.queued.some(
+			(j) => j.path === filePath && j.state.includes("bitrate_analysis"),
+		);
+
 	// Check if loading is for the current file (not a different file)
-	const isLoadingForCurrentFile = loading && currentJobPath === filePath;
+	// Also consider if there's an active job in the queue for this file
+	const isLoadingForCurrentFile =
+		(loading && currentJobPath === filePath) || hasActiveJobForFile;
+
+	// Debug logging for render state
+	console.log("[BitratePanel] Render state:", {
+		filePath,
+		loading,
+		currentJobPath,
+		isLoadingForCurrentFile,
+		analysisMatchesFile,
+		error,
+		progress,
+	});
 
 	// Check if there's a background job running for a different file
 	const isLoadingOtherFile =
@@ -190,12 +262,24 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 		);
 	}
 
+	// Helper to format seconds as "Xm Ys" or "Xs"
+	const formatTime = (seconds: number): string => {
+		if (seconds < 60) {
+			return `${Math.round(seconds)}s`;
+		}
+		const mins = Math.floor(seconds / 60);
+		const secs = Math.round(seconds % 60);
+		return `${mins}m ${secs}s`;
+	};
+
 	if (isLoadingForCurrentFile) {
 		return (
 			<div className="flex h-full items-center justify-center">
 				<div className="w-full max-w-md px-8 text-center">
 					<div className="mb-4 font-medium text-muted-foreground text-sm">
-						Analyzing bitrate...
+						{progress?.using_sampling
+							? "Analyzing bitrate (sampling mode)..."
+							: "Analyzing bitrate..."}
 					</div>
 					{progress && (
 						<>
@@ -213,6 +297,35 @@ export function BitratePanel({ filePath }: BitratePanelProps) {
 									{Math.round(progress.percentage)}%
 								</span>
 							</div>
+							{/* ETA and elapsed time */}
+							<div className="mt-2 flex items-center justify-between text-muted-foreground/70 text-xs">
+								<span>
+									{progress.elapsed_seconds !== undefined
+										? `Elapsed: ${formatTime(progress.elapsed_seconds)}`
+										: ""}
+								</span>
+								<span>
+									{progress.eta_seconds !== undefined &&
+									progress.eta_seconds > 0
+										? `ETA: ${formatTime(progress.eta_seconds)}`
+										: ""}
+								</span>
+							</div>
+							{/* Stream count info */}
+							{progress.stream_count !== undefined &&
+								progress.stream_count > 1 && (
+									<div className="mt-1 text-muted-foreground/60 text-xs">
+										{progress.current_stream !== undefined
+											? `Stream ${progress.current_stream}/${progress.stream_count}`
+											: `${progress.stream_count} streams`}
+									</div>
+								)}
+							{/* Sampling mode indicator */}
+							{progress.using_sampling && (
+								<div className="mt-1 text-amber-500/80 text-xs">
+									Large file detected — using sampling for faster analysis
+								</div>
+							)}
 						</>
 					)}
 					{!progress && (

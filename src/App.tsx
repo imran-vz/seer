@@ -1,3 +1,4 @@
+import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { BitratePanel } from "./components/BitratePanel";
@@ -7,9 +8,49 @@ import { MetadataPanel } from "./components/MetadataPanel";
 import { StreamsPanel } from "./components/StreamsPanel";
 import { TitleBar } from "./components/TitleBar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { useAppInitialization } from "./hooks/useAppInitialization";
 import { isVideoOrAudioFile } from "./lib/fileUtils";
-import { useInitDatabase } from "./lib/useDatabase";
 import { useFileBrowserStore } from "./stores/fileBrowserStore";
+
+function LoadingScreen({
+	stage,
+	error,
+}: {
+	stage: string;
+	error: string | null;
+}) {
+	const stageLabels: Record<string, string> = {
+		database: "Initializing database...",
+		settings: "Loading settings...",
+		"file-browser": "Preparing file browser...",
+	};
+
+	return (
+		<div className="app-container flex h-screen flex-col overflow-hidden">
+			<TitleBar />
+			<div className="flex flex-1 flex-col items-center justify-center gap-4">
+				{error ? (
+					<>
+						<div className="font-medium text-destructive text-lg">
+							Initialization Error
+						</div>
+						<div className="max-w-md text-center text-muted-foreground text-sm">
+							{error}
+						</div>
+					</>
+				) : (
+					<>
+						<Loader2 className="size-10 animate-spin text-primary" />
+						<div className="text-muted-foreground text-sm">
+							{stageLabels[stage] || "Loading..."}
+						</div>
+					</>
+				)}
+			</div>
+			<Toaster richColors />
+		</div>
+	);
+}
 
 function App() {
 	const [depsChecked, setDepsChecked] = useState(false);
@@ -17,18 +58,8 @@ function App() {
 	const selectedPath = useFileBrowserStore((state) => state.selectedPath);
 	const showBitrateTab = isVideoOrAudioFile(selectedPath);
 
-	// Initialize SQLite database
-	const { initialized: dbInitialized, error: dbError } = useInitDatabase();
-
-	// Log database initialization status
-	useEffect(() => {
-		if (dbInitialized) {
-			console.log("[App] Database initialized successfully");
-		}
-		if (dbError) {
-			console.error("[App] Database initialization failed:", dbError);
-		}
-	}, [dbInitialized, dbError]);
+	// Centralized app initialization
+	const { stage, initialized, error } = useAppInitialization();
 
 	// Switch to metadata tab if user selects an image while on bitrate tab
 	useEffect(() => {
@@ -37,6 +68,7 @@ function App() {
 		}
 	}, [showBitrateTab, activeTab]);
 
+	// Show dependency check first
 	if (!depsChecked) {
 		return (
 			<div className="app-container flex h-screen flex-col overflow-hidden">
@@ -45,6 +77,11 @@ function App() {
 				<Toaster richColors />
 			</div>
 		);
+	}
+
+	// Show loading screen while stores are initializing
+	if (!initialized || error) {
+		return <LoadingScreen stage={stage} error={error} />;
 	}
 
 	return (
