@@ -9,7 +9,7 @@ use tauri::Emitter;
 use crate::bitrate::compute_file_hash;
 use crate::jobs::{self, JobStartResult, JobType};
 use crate::media;
-use crate::types::{MediaStreams, StreamRemovalResult};
+use crate::types::{BulkStreamRemovalResult, MediaStreams, StreamRemovalOp, StreamRemovalResult};
 
 #[tauri::command]
 pub fn get_media_streams(path: String) -> Result<MediaStreams, String> {
@@ -85,4 +85,67 @@ pub async fn remove_streams(
         .ok();
 
     result
+}
+
+#[tauri::command]
+pub async fn bulk_remove_streams(
+    operations: Vec<StreamRemovalOp>,
+    overwrite: bool,
+    window: tauri::Window,
+) -> Result<BulkStreamRemovalResult, String> {
+    let mut job_ids = Vec::new();
+    let mut errors = Vec::new();
+    let mut jobs_queued = 0;
+
+    for op in operations {
+        let path = op.path.clone();
+        let stream_indices = op.stream_indices;
+
+        // Compute file hash for job ID
+        let file_hash = match compute_file_hash(&path) {
+            Ok(hash) => hash,
+            Err(e) => {
+                errors.push(format!("{}: {}", path, e));
+                continue;
+            }
+        };
+
+        // Enqueue job - starts immediately if slot available, otherwise queues
+        match jobs::enqueue_job(
+            &path,
+            &file_hash,
+            JobType::StreamRemoval {
+                stream_indices: stream_indices.clone(),
+                overwrite,
+            },
+        ) {
+            JobStartResult::Started(id) | JobStartResult::Queued(id) => {
+                job_ids.push(id);
+                jobs_queued += 1;
+            }
+            JobStartResult::AlreadyExists(job_id) => {
+                errors.push(format!(
+                    "{}: Stream removal already queued or in progress (job {})",
+                    path, job_id
+                ));
+            }
+        }
+    }
+
+    // Emit queue update
+    window
+        .emit("job-queue-update", jobs::get_queue_status())
+        .ok();
+
+    info!(
+        "Bulk stream removal: queued {} jobs, {} errors",
+        jobs_queued,
+        errors.len()
+    );
+
+    Ok(BulkStreamRemovalResult {
+        jobs_queued,
+        job_ids,
+        errors,
+    })
 }

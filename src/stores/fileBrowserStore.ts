@@ -65,6 +65,11 @@ interface FileBrowserState {
 	copySelected: (
 		destination: string,
 	) => Promise<{ success: number; failed: number }>;
+
+	// Bulk rename (UI handles preview/execution)
+	getBulkRenameablePaths: () => string[];
+	getCreateFoldersPaths: () => string[];
+	getMediaFilePaths: () => string[];
 }
 
 export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
@@ -420,5 +425,24 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
 		set({ selectedPaths: new Set() });
 		await refresh();
 		return { success, failed };
+	},
+
+	// Get paths for bulk rename
+	getBulkRenameablePaths: () => {
+		const { selectedPaths } = get();
+		return Array.from(selectedPaths);
+	},
+
+	// Create folders from selection (UI handles the actual creation)
+	getCreateFoldersPaths: () => {
+		const { selectedPaths } = get();
+		return Array.from(selectedPaths);
+	},
+
+	// Get media file paths from selection
+	getMediaFilePaths: () => {
+		const { selectedPaths, files } = get();
+		const selectedFiles = files.filter(f => selectedPaths.has(f.path));
+		return selectedFiles.filter(f => f.is_media && !f.is_dir).map(f => f.path);
 	},
 }));

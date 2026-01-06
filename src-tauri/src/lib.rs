@@ -58,9 +58,13 @@ pub fn run() {
             commands::copy_file,
             commands::create_folder,
             commands::reveal_in_folder,
+            commands::preview_bulk_rename,
+            commands::execute_bulk_rename,
+            commands::create_folders_from_selection,
             // Media operations
             commands::get_media_streams,
             commands::remove_streams,
+            commands::bulk_remove_streams,
             // Bitrate analysis
             commands::analyze_stream_bitrate,
             commands::analyze_overall_bitrate,

@@ -41,6 +41,86 @@ pub struct FileOperationResult {
 }
 
 // ============================================================================
+// Bulk Rename Types
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RenamePattern {
+    FindReplace {
+        find: String,
+        replace: String,
+        case_sensitive: bool,
+    },
+    Sequential {
+        pattern: String,
+        start: usize,
+        padding: usize,
+    },
+    CaseTransform {
+        mode: CaseMode,
+    },
+    Template {
+        template: String,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CaseMode {
+    Lowercase,
+    Uppercase,
+    TitleCase,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RenamePreview {
+    pub original_path: String,
+    pub original_name: String,
+    pub new_name: String,
+    pub new_path: String,
+    pub conflict: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BulkRenameResult {
+    pub success: usize,
+    pub failed: usize,
+    pub errors: Vec<String>,
+}
+
+// ============================================================================
+// Folder Creation Types
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum FolderCreationMode {
+    PerFile,
+    Grouped { criteria: GroupCriteria },
+    Single { name: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum GroupCriteria {
+    Extension,
+    DateModified { granularity: String }, // "day" | "month" | "year"
+    MediaType,
+    Resolution,
+    Codec,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FolderCreationResult {
+    pub success: usize,
+    pub failed: usize,
+    pub folders_created: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+// ============================================================================
 // Media Stream Types
 // ============================================================================
 
@@ -104,6 +184,19 @@ pub struct StreamRemovalResult {
     pub success: bool,
     pub output_path: String,
     pub message: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct StreamRemovalOp {
+    pub path: String,
+    pub stream_indices: Vec<i32>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BulkStreamRemovalResult {
+    pub jobs_queued: usize,
+    pub job_ids: Vec<String>,
+    pub errors: Vec<String>,
 }
 
 // ============================================================================

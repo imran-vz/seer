@@ -877,6 +877,8 @@ pub fn extrapolate_sampled_data(
 mod tests {
     use super::*;
 
+    // ========== aggregate_bitrate_intervals tests ==========
+
     #[test]
     fn test_aggregate_empty_frames() {
         let frames: Vec<(f64, u64, Option<String>)> = vec![];
@@ -885,12 +887,110 @@ mod tests {
     }
 
     #[test]
+    fn test_aggregate_single_frame() {
+        let frames = vec![(0.5, 1000, Some("I".to_string()))];
+        let result = aggregate_bitrate_intervals(frames, 1.0, 2.0);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].bitrate, 8000); // 1000 bytes * 8 / 1 second
+        assert_eq!(result[0].frame_type, Some("I".to_string()));
+        assert_eq!(result[1].bitrate, 0);
+    }
+
+    #[test]
+    fn test_aggregate_multiple_frames_same_interval() {
+        let frames = vec![
+            (0.1, 1000, None),
+            (0.3, 2000, Some("I".to_string())),
+            (0.7, 1500, None),
+        ];
+        let result = aggregate_bitrate_intervals(frames, 1.0, 2.0);
+        assert_eq!(result.len(), 2);
+        // Total: 4500 bytes * 8 / 1 second = 36000 bps
+        assert_eq!(result[0].bitrate, 36000);
+        assert_eq!(result[0].frame_type, Some("I".to_string()));
+    }
+
+    #[test]
+    fn test_aggregate_frames_spanning_intervals() {
+        let frames = vec![
+            (0.5, 1000, Some("I".to_string())),
+            (1.5, 2000, None),
+            (2.5, 1500, None),
+        ];
+        let result = aggregate_bitrate_intervals(frames, 1.0, 3.0);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].bitrate, 8000); // 1000 * 8 / 1
+        assert_eq!(result[1].bitrate, 16000); // 2000 * 8 / 1
+        assert_eq!(result[2].bitrate, 12000); // 1500 * 8 / 1
+    }
+
+    #[test]
+    fn test_aggregate_non_uniform_intervals() {
+        let frames = vec![(0.3, 5000, None)]; // Frame at 0.3s
+        let result = aggregate_bitrate_intervals(frames, 0.5, 1.0);
+        assert_eq!(result.len(), 2);
+        // Frame at 0.3s goes into interval 0 (0.3 / 0.5 = 0.6, floor = 0)
+        // 5000 bytes * 8 / 0.5 seconds = 80000 bps
+        assert_eq!(result[0].bitrate, 80000);
+        assert_eq!(result[1].bitrate, 0);
+    }
+
+    #[test]
+    fn test_aggregate_frame_beyond_duration() {
+        let frames = vec![(10.0, 1000, None)]; // Frame at 10s
+        let result = aggregate_bitrate_intervals(frames, 1.0, 5.0); // Duration only 5s
+        assert_eq!(result.len(), 5);
+        // Frame should be ignored as it's beyond duration
+        assert!(result.iter().all(|p| p.bitrate == 0));
+    }
+
+    #[test]
+    fn test_aggregate_zero_duration() {
+        let frames = vec![(0.0, 1000, None)];
+        let result = aggregate_bitrate_intervals(frames, 1.0, 0.0);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_aggregate_preserves_first_frame_type() {
+        let frames = vec![
+            (0.1, 1000, Some("I".to_string())),
+            (0.2, 1000, Some("P".to_string())),
+            (0.3, 1000, Some("B".to_string())),
+        ];
+        let result = aggregate_bitrate_intervals(frames, 1.0, 1.0);
+        assert_eq!(result[0].frame_type, Some("I".to_string())); // First frame type preserved
+    }
+
+    // ========== calculate_statistics tests ==========
+
+    #[test]
     fn test_calculate_statistics_empty() {
         let data: Vec<BitrateDataPoint> = vec![];
         let stats = calculate_statistics(&data);
         assert_eq!(stats.min_bitrate, 0);
         assert_eq!(stats.max_bitrate, 0);
         assert_eq!(stats.avg_bitrate, 0);
+        assert_eq!(stats.median_bitrate, 0);
+        assert_eq!(stats.std_deviation, 0.0);
+        assert_eq!(stats.total_frames, 0);
+        assert!(stats.peak_intervals.is_empty());
+    }
+
+    #[test]
+    fn test_calculate_statistics_single_point() {
+        let data = vec![BitrateDataPoint {
+            timestamp: 0.0,
+            bitrate: 5000,
+            frame_type: None,
+        }];
+        let stats = calculate_statistics(&data);
+        assert_eq!(stats.min_bitrate, 5000);
+        assert_eq!(stats.max_bitrate, 5000);
+        assert_eq!(stats.avg_bitrate, 5000);
+        assert_eq!(stats.median_bitrate, 5000);
+        assert_eq!(stats.std_deviation, 0.0); // No variance with single point
+        assert_eq!(stats.total_frames, 1);
     }
 
     #[test]
@@ -918,5 +1018,545 @@ mod tests {
         assert_eq!(stats.avg_bitrate, 2000);
         assert_eq!(stats.median_bitrate, 2000);
         assert_eq!(stats.total_frames, 3);
+        assert!(stats.std_deviation > 0.0); // Should have variance
+    }
+
+    #[test]
+    fn test_calculate_statistics_median_even() {
+        let data = vec![
+            BitrateDataPoint {
+                timestamp: 0.0,
+                bitrate: 1000,
+                frame_type: None,
+            },
+            BitrateDataPoint {
+                timestamp: 1.0,
+                bitrate: 2000,
+                frame_type: None,
+            },
+            BitrateDataPoint {
+                timestamp: 2.0,
+                bitrate: 3000,
+                frame_type: None,
+            },
+            BitrateDataPoint {
+                timestamp: 3.0,
+                bitrate: 4000,
+                frame_type: None,
+            },
+        ];
+        let stats = calculate_statistics(&data);
+        assert_eq!(stats.median_bitrate, 2500); // (2000 + 3000) / 2
+    }
+
+    #[test]
+    fn test_calculate_statistics_median_odd() {
+        let data = vec![
+            BitrateDataPoint {
+                timestamp: 0.0,
+                bitrate: 1000,
+                frame_type: None,
+            },
+            BitrateDataPoint {
+                timestamp: 1.0,
+                bitrate: 5000,
+                frame_type: None,
+            },
+            BitrateDataPoint {
+                timestamp: 2.0,
+                bitrate: 3000,
+                frame_type: None,
+            },
+        ];
+        let stats = calculate_statistics(&data);
+        assert_eq!(stats.median_bitrate, 3000); // Middle value when sorted: [1000, 3000, 5000]
+    }
+
+    #[test]
+    fn test_calculate_statistics_no_peaks() {
+        // All bitrates below 1.5x average threshold
+        let data = vec![
+            BitrateDataPoint {
+                timestamp: 0.0,
+                bitrate: 1000,
+                frame_type: None,
+            },
+            BitrateDataPoint {
+                timestamp: 1.0,
+                bitrate: 1100,
+                frame_type: None,
+            },
+            BitrateDataPoint {
+                timestamp: 2.0,
+                bitrate: 1200,
+                frame_type: None,
+            },
+        ];
+        let stats = calculate_statistics(&data);
+        assert!(stats.peak_intervals.is_empty());
+    }
+
+    #[test]
+    fn test_calculate_statistics_single_peak() {
+        // Create data with clear peak
+        // We need many low values to keep average low, so threshold is easier to exceed
+        let mut data = vec![];
+        // 10 points at 1000 bps
+        for i in 0..10 {
+            data.push(BitrateDataPoint {
+                timestamp: i as f64,
+                bitrate: 1000,
+                frame_type: None,
+            });
+        }
+        // 6 points at 5000 bps (peak)
+        for i in 10..16 {
+            data.push(BitrateDataPoint {
+                timestamp: i as f64,
+                bitrate: 5000,
+                frame_type: None,
+            });
+        }
+        // 4 more points at 1000 bps
+        for i in 16..20 {
+            data.push(BitrateDataPoint {
+                timestamp: i as f64,
+                bitrate: 1000,
+                frame_type: None,
+            });
+        }
+
+        let stats = calculate_statistics(&data);
+        // Avg = (10*1000 + 6*5000 + 4*1000) / 20 = 44000 / 20 = 2200
+        // Threshold = 2200 * 1.5 = 3300
+        // All 5000 bps points are above threshold, peak lasts 6 seconds (10-15)
+        assert_eq!(stats.peak_intervals.len(), 1);
+        assert_eq!(stats.peak_intervals[0].start_time, 10.0);
+        assert_eq!(stats.peak_intervals[0].end_time, 16.0);
+        assert!(stats.peak_intervals[0].duration > 5.0);
+        assert_eq!(stats.peak_intervals[0].peak_bitrate, 5000);
+    }
+
+    #[test]
+    fn test_calculate_statistics_short_peak_ignored() {
+        // Peak that lasts < 5 seconds should be ignored
+        let data = vec![
+            BitrateDataPoint {
+                timestamp: 0.0,
+                bitrate: 1000,
+                frame_type: None,
+            },
+            BitrateDataPoint {
+                timestamp: 1.0,
+                bitrate: 5000, // Spike
+                frame_type: None,
+            },
+            BitrateDataPoint {
+                timestamp: 2.0,
+                bitrate: 5000, // Spike continues
+                frame_type: None,
+            },
+            BitrateDataPoint {
+                timestamp: 3.0,
+                bitrate: 1000, // Back to normal (only 2s peak)
+                frame_type: None,
+            },
+        ];
+        let stats = calculate_statistics(&data);
+        assert!(stats.peak_intervals.is_empty()); // < 5s peaks ignored
+    }
+
+    #[test]
+    fn test_calculate_statistics_multiple_peaks() {
+        let mut data = vec![];
+        // Low baseline (10 points at 1000)
+        for i in 0..10 {
+            data.push(BitrateDataPoint {
+                timestamp: i as f64,
+                bitrate: 1000,
+                frame_type: None,
+            });
+        }
+        // First peak (6 points at 5000)
+        for i in 10..16 {
+            data.push(BitrateDataPoint {
+                timestamp: i as f64,
+                bitrate: 5000,
+                frame_type: None,
+            });
+        }
+        // Gap between peaks (4 points at 1000)
+        for i in 16..20 {
+            data.push(BitrateDataPoint {
+                timestamp: i as f64,
+                bitrate: 1000,
+                frame_type: None,
+            });
+        }
+        // Second peak (6 points at 6000)
+        for i in 20..26 {
+            data.push(BitrateDataPoint {
+                timestamp: i as f64,
+                bitrate: 6000,
+                frame_type: None,
+            });
+        }
+        // Ending baseline (4 points at 1000)
+        for i in 26..30 {
+            data.push(BitrateDataPoint {
+                timestamp: i as f64,
+                bitrate: 1000,
+                frame_type: None,
+            });
+        }
+
+        let stats = calculate_statistics(&data);
+        // Avg = (18*1000 + 6*5000 + 6*6000) / 30 = 84000 / 30 = 2800
+        // Threshold = 2800 * 1.5 = 4200
+        // Both 5000 and 6000 are above threshold, each lasting 6 seconds
+        assert_eq!(stats.peak_intervals.len(), 2);
+        assert!(stats.peak_intervals[0].duration > 5.0);
+        assert!(stats.peak_intervals[1].duration > 5.0);
+        assert_eq!(stats.peak_intervals[0].peak_bitrate, 5000);
+        assert_eq!(stats.peak_intervals[1].peak_bitrate, 6000);
+    }
+
+    // ========== sort_streams_audio_first tests ==========
+
+    #[test]
+    fn test_sort_streams_empty() {
+        let mut streams: Vec<&StreamInfo> = vec![];
+        sort_streams_audio_first(&mut streams);
+        assert!(streams.is_empty());
+    }
+
+    #[test]
+    fn test_sort_streams_audio_first_order() {
+        let video1 = StreamInfo {
+            index: 0,
+            stream_type: StreamType::Video,
+            codec_name: Some("h264".to_string()),
+            codec_long_name: None,
+            language: None,
+            title: None,
+            is_default: false,
+            is_forced: false,
+            is_hearing_impaired: false,
+            is_visual_impaired: false,
+            is_commentary: false,
+            is_lyrics: false,
+            is_karaoke: false,
+            is_cover_art: false,
+            width: Some(1920),
+            height: Some(1080),
+            frame_rate: Some("30".to_string()),
+            pixel_format: None,
+            sample_rate: None,
+            channels: None,
+            channel_layout: None,
+            bit_rate: Some("5000000".to_string()),
+            subtitle_format: None,
+            estimated_size: None,
+        };
+        let audio1 = StreamInfo {
+            index: 1,
+            stream_type: StreamType::Audio,
+            codec_name: Some("aac".to_string()),
+            codec_long_name: None,
+            language: None,
+            title: None,
+            is_default: false,
+            is_forced: false,
+            is_hearing_impaired: false,
+            is_visual_impaired: false,
+            is_commentary: false,
+            is_lyrics: false,
+            is_karaoke: false,
+            is_cover_art: false,
+            width: None,
+            height: None,
+            frame_rate: None,
+            pixel_format: None,
+            sample_rate: Some("48000".to_string()),
+            channels: Some(2),
+            channel_layout: Some("stereo".to_string()),
+            bit_rate: Some("128000".to_string()),
+            subtitle_format: None,
+            estimated_size: None,
+        };
+        let video2 = StreamInfo {
+            index: 2,
+            stream_type: StreamType::Video,
+            codec_name: Some("h264".to_string()),
+            codec_long_name: None,
+            language: None,
+            title: None,
+            is_default: false,
+            is_forced: false,
+            is_hearing_impaired: false,
+            is_visual_impaired: false,
+            is_commentary: false,
+            is_lyrics: false,
+            is_karaoke: false,
+            is_cover_art: false,
+            width: Some(1280),
+            height: Some(720),
+            frame_rate: Some("30".to_string()),
+            pixel_format: None,
+            sample_rate: None,
+            channels: None,
+            channel_layout: None,
+            bit_rate: Some("2500000".to_string()),
+            subtitle_format: None,
+            estimated_size: None,
+        };
+
+        let mut streams = vec![&video1, &audio1, &video2];
+        sort_streams_audio_first(&mut streams);
+
+        // Audio should come first, then videos
+        assert_eq!(streams[0].index, 1); // audio1
+        assert_eq!(streams[1].index, 0); // video1
+        assert_eq!(streams[2].index, 2); // video2
+    }
+
+    #[test]
+    fn test_sort_streams_same_type_by_index() {
+        let audio1 = StreamInfo {
+            index: 2,
+            stream_type: StreamType::Audio,
+            codec_name: Some("aac".to_string()),
+            codec_long_name: None,
+            language: None,
+            title: None,
+            is_default: false,
+            is_forced: false,
+            is_hearing_impaired: false,
+            is_visual_impaired: false,
+            is_commentary: false,
+            is_lyrics: false,
+            is_karaoke: false,
+            is_cover_art: false,
+            width: None,
+            height: None,
+            frame_rate: None,
+            pixel_format: None,
+            sample_rate: Some("48000".to_string()),
+            channels: Some(2),
+            channel_layout: Some("stereo".to_string()),
+            bit_rate: Some("128000".to_string()),
+            subtitle_format: None,
+            estimated_size: None,
+        };
+        let audio2 = StreamInfo {
+            index: 0,
+            stream_type: StreamType::Audio,
+            codec_name: Some("aac".to_string()),
+            codec_long_name: None,
+            language: None,
+            title: None,
+            is_default: false,
+            is_forced: false,
+            is_hearing_impaired: false,
+            is_visual_impaired: false,
+            is_commentary: false,
+            is_lyrics: false,
+            is_karaoke: false,
+            is_cover_art: false,
+            width: None,
+            height: None,
+            frame_rate: None,
+            pixel_format: None,
+            sample_rate: Some("48000".to_string()),
+            channels: Some(2),
+            channel_layout: Some("stereo".to_string()),
+            bit_rate: Some("128000".to_string()),
+            subtitle_format: None,
+            estimated_size: None,
+        };
+
+        let mut streams = vec![&audio1, &audio2];
+        sort_streams_audio_first(&mut streams);
+
+        // Same type, sorted by index
+        assert_eq!(streams[0].index, 0); // audio2
+        assert_eq!(streams[1].index, 2); // audio1
+    }
+
+    #[test]
+    fn test_sort_streams_other_type_last() {
+        let video = StreamInfo {
+            index: 0,
+            stream_type: StreamType::Video,
+            codec_name: Some("h264".to_string()),
+            codec_long_name: None,
+            language: None,
+            title: None,
+            is_default: false,
+            is_forced: false,
+            is_hearing_impaired: false,
+            is_visual_impaired: false,
+            is_commentary: false,
+            is_lyrics: false,
+            is_karaoke: false,
+            is_cover_art: false,
+            width: Some(1920),
+            height: Some(1080),
+            frame_rate: Some("30".to_string()),
+            pixel_format: None,
+            sample_rate: None,
+            channels: None,
+            channel_layout: None,
+            bit_rate: Some("5000000".to_string()),
+            subtitle_format: None,
+            estimated_size: None,
+        };
+        let audio = StreamInfo {
+            index: 1,
+            stream_type: StreamType::Audio,
+            codec_name: Some("aac".to_string()),
+            codec_long_name: None,
+            language: None,
+            title: None,
+            is_default: false,
+            is_forced: false,
+            is_hearing_impaired: false,
+            is_visual_impaired: false,
+            is_commentary: false,
+            is_lyrics: false,
+            is_karaoke: false,
+            is_cover_art: false,
+            width: None,
+            height: None,
+            frame_rate: None,
+            pixel_format: None,
+            sample_rate: Some("48000".to_string()),
+            channels: Some(2),
+            channel_layout: Some("stereo".to_string()),
+            bit_rate: Some("128000".to_string()),
+            subtitle_format: None,
+            estimated_size: None,
+        };
+        let subtitle = StreamInfo {
+            index: 2,
+            stream_type: StreamType::Subtitle,
+            codec_name: Some("subrip".to_string()),
+            codec_long_name: None,
+            language: None,
+            title: None,
+            is_default: false,
+            is_forced: false,
+            is_hearing_impaired: false,
+            is_visual_impaired: false,
+            is_commentary: false,
+            is_lyrics: false,
+            is_karaoke: false,
+            is_cover_art: false,
+            width: None,
+            height: None,
+            frame_rate: None,
+            pixel_format: None,
+            sample_rate: None,
+            channels: None,
+            channel_layout: None,
+            bit_rate: None,
+            subtitle_format: Some("subrip".to_string()),
+            estimated_size: None,
+        };
+
+        let mut streams = vec![&subtitle, &video, &audio];
+        sort_streams_audio_first(&mut streams);
+
+        // Order: audio, video, subtitle
+        assert_eq!(streams[0].stream_type, StreamType::Audio);
+        assert_eq!(streams[1].stream_type, StreamType::Video);
+        assert_eq!(streams[2].stream_type, StreamType::Subtitle);
+    }
+
+    // ========== extrapolate_sampled_data tests ==========
+
+    #[test]
+    fn test_extrapolate_empty_samples() {
+        let sampled: Vec<(f64, u64, Option<String>)> = vec![];
+        let result = extrapolate_sampled_data(&sampled, 10.0, 100.0, 1.0);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extrapolate_single_sample() {
+        let sampled = vec![(5.0, 10000, None)]; // 10KB at 5s
+        let result = extrapolate_sampled_data(&sampled, 10.0, 100.0, 1.0);
+        assert_eq!(result.len(), 100); // 100 seconds / 1 second intervals
+
+        // Check that the interval containing the sample has actual data
+        assert_eq!(result[5].bitrate, 80000); // 10000 bytes * 8 / 1 second
+
+        // Check that other intervals use average bitrate
+        let avg_bitrate = (10000 * 8) as f64 / 10.0; // Total bytes * 8 / sampled duration
+        assert_eq!(result[0].bitrate, avg_bitrate as u64);
+        assert_eq!(result[10].bitrate, avg_bitrate as u64);
+    }
+
+    #[test]
+    fn test_extrapolate_multiple_samples() {
+        let sampled = vec![
+            (1.0, 5000, None),
+            (2.0, 6000, None),
+            (50.0, 7000, None),
+        ];
+        let result = extrapolate_sampled_data(&sampled, 10.0, 100.0, 1.0);
+        assert_eq!(result.len(), 100);
+
+        // Intervals with actual data should have calculated bitrates
+        assert_eq!(result[1].bitrate, 40000); // 5000 * 8 / 1
+        assert_eq!(result[2].bitrate, 48000); // 6000 * 8 / 1
+        assert_eq!(result[50].bitrate, 56000); // 7000 * 8 / 1
+
+        // Average bitrate: (5000 + 6000 + 7000) * 8 / 10.0 = 14400
+        assert_eq!(result[25].bitrate, 14400); // Gap interval uses average
+    }
+
+    #[test]
+    fn test_extrapolate_zero_sampled_duration() {
+        let sampled = vec![(1.0, 5000, None)];
+        let result = extrapolate_sampled_data(&sampled, 0.0, 100.0, 1.0);
+        assert_eq!(result.len(), 100);
+        // When sampled_duration is 0, avg_bitrate = 0
+        // But intervals with actual data still compute bitrate from their data
+        // Interval 1 has the sample, so it has non-zero bitrate
+        assert_eq!(result[1].bitrate, 40000); // 5000 * 8 / 1.0
+        // Other intervals use avg_bitrate which is 0
+        assert_eq!(result[0].bitrate, 0);
+        assert_eq!(result[10].bitrate, 0);
+    }
+
+    #[test]
+    fn test_extrapolate_different_interval_size() {
+        let sampled = vec![(2.5, 10000, None)]; // 10KB at 2.5s
+        let result = extrapolate_sampled_data(&sampled, 5.0, 10.0, 0.5);
+        assert_eq!(result.len(), 20); // 10 seconds / 0.5 second intervals
+
+        // Interval index = 2.5 / 0.5 = 5
+        assert_eq!(result[5].bitrate, 160000); // 10000 * 8 / 0.5
+    }
+
+    #[test]
+    fn test_extrapolate_timestamps() {
+        let sampled = vec![(1.0, 5000, None)];
+        let result = extrapolate_sampled_data(&sampled, 10.0, 10.0, 1.0);
+
+        // Check timestamps are correct
+        assert_eq!(result[0].timestamp, 0.0);
+        assert_eq!(result[5].timestamp, 5.0);
+        assert_eq!(result[9].timestamp, 9.0);
+    }
+
+    #[test]
+    fn test_extrapolate_no_frame_types() {
+        let sampled = vec![(1.0, 5000, Some("I".to_string()))];
+        let result = extrapolate_sampled_data(&sampled, 10.0, 100.0, 1.0);
+
+        // Extrapolated data should not have frame types (set to None)
+        assert!(result.iter().all(|p| p.frame_type.is_none()));
     }
 }

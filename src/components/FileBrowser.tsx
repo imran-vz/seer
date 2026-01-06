@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
 	ChevronLeft,
@@ -11,11 +12,15 @@ import {
 	Move,
 	Pencil,
 	RefreshCw,
+	TextCursorInput,
 	Trash,
 	Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { BulkRenameDialog } from "@/components/BulkRenameDialog";
+import { BulkStreamCleanupDialog } from "@/components/BulkStreamCleanupDialog";
+import { FolderCreationDialog } from "@/components/FolderCreationDialog";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -81,6 +86,8 @@ export function FileBrowser() {
 		deleteSelected,
 		moveSelected,
 		copySelected,
+		getBulkRenameablePaths,
+		getMediaFilePaths,
 	} = useFileBrowserStore();
 
 	const [dialogType, setDialogType] = useState<DialogType>(null);
@@ -88,6 +95,11 @@ export function FileBrowser() {
 	const [targetFile, setTargetFile] = useState<FileEntry | null>(null);
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 	const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+	const [bulkRenameDialogOpen, setBulkRenameDialogOpen] = useState(false);
+	const [bulkStreamCleanupDialogOpen, setBulkStreamCleanupDialogOpen] =
+		useState(false);
+	const [folderCreationDialogOpen, setFolderCreationDialogOpen] =
+		useState(false);
 	const [operationError, setOperationError] = useState<string | null>(null);
 
 	const formatSize = (bytes: number): string => {
@@ -386,6 +398,35 @@ export function FileBrowser() {
 					<Button
 						variant="ghost"
 						size="sm"
+						onClick={() => setBulkRenameDialogOpen(true)}
+						className="h-7 text-xs"
+					>
+						<TextCursorInput className="mr-1 h-3.5 w-3.5" />
+						Rename
+					</Button>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => setFolderCreationDialogOpen(true)}
+						className="h-7 text-xs"
+					>
+						<FolderPlus className="mr-1 h-3.5 w-3.5" />
+						Create Folders
+					</Button>
+					{getMediaFilePaths().length > 0 && (
+						<Button
+							variant="ghost"
+							size="sm"
+							onClick={() => setBulkStreamCleanupDialogOpen(true)}
+							className="h-7 text-xs"
+						>
+							<Film className="mr-1 h-3.5 w-3.5" />
+							Clean Streams
+						</Button>
+					)}
+					<Button
+						variant="ghost"
+						size="sm"
 						onClick={openBulkMoveDialog}
 						className="h-7 text-xs"
 					>
@@ -548,20 +589,48 @@ export function FileBrowser() {
 						<DialogDescription>{getDialogDescription()}</DialogDescription>
 					</DialogHeader>
 					<div className="py-4">
-						<Input
-							value={dialogInput}
-							onChange={(e) => setDialogInput(e.target.value)}
-							placeholder={
-								dialogType === "rename" || dialogType === "newFolder"
-									? "Name"
-									: "Path"
-							}
-							onKeyDown={(e) => {
-								if (e.key === "Enter") {
-									handleDialogSubmit();
+						<div className="flex gap-2">
+							<Input
+								value={dialogInput}
+								onChange={(e) => setDialogInput(e.target.value)}
+								placeholder={
+									dialogType === "rename" || dialogType === "newFolder"
+										? "Name"
+										: "Path"
 								}
-							}}
-						/>
+								onKeyDown={(e) => {
+									if (e.key === "Enter") {
+										handleDialogSubmit();
+									}
+								}}
+								className="flex-1"
+							/>
+							{(dialogType === "move" ||
+								dialogType === "copy" ||
+								dialogType === "bulkMove" ||
+								dialogType === "bulkCopy") && (
+								<Button
+									variant="outline"
+									size="icon"
+									onClick={async () => {
+										try {
+											const selected = await invoke<string | null>(
+												"pick_folder",
+											);
+											if (selected) {
+												setDialogInput(selected);
+											}
+										} catch (e) {
+											console.error("Folder picker error:", e);
+											toast.error(String(e));
+										}
+									}}
+									title="Browse for folder"
+								>
+									<FolderOpen className="size-4" />
+								</Button>
+							)}
+						</div>
 						{operationError && (
 							<p className="mt-2 text-destructive text-sm">{operationError}</p>
 						)}
@@ -648,6 +717,40 @@ export function FileBrowser() {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
+
+			{/* Bulk Rename Dialog */}
+			<BulkRenameDialog
+				open={bulkRenameDialogOpen}
+				onOpenChange={setBulkRenameDialogOpen}
+				paths={getBulkRenameablePaths()}
+				onSuccess={() => {
+					clearSelection();
+					refresh();
+				}}
+			/>
+
+			{/* Bulk Stream Cleanup Dialog */}
+			<BulkStreamCleanupDialog
+				open={bulkStreamCleanupDialogOpen}
+				onOpenChange={setBulkStreamCleanupDialogOpen}
+				paths={getMediaFilePaths()}
+				onSuccess={() => {
+					clearSelection();
+					refresh();
+				}}
+			/>
+
+			{/* Folder Creation Dialog */}
+			<FolderCreationDialog
+				open={folderCreationDialogOpen}
+				onOpenChange={setFolderCreationDialogOpen}
+				paths={getBulkRenameablePaths()}
+				currentPath={currentPath}
+				onSuccess={() => {
+					clearSelection();
+					refresh();
+				}}
+			/>
 		</div>
 	);
 }
