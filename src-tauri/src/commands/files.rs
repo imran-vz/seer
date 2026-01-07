@@ -3,6 +3,7 @@
 //! This module contains all Tauri commands for file system operations.
 
 use crate::files;
+use crate::files::filters::{FilterCriteria, FilterResult};
 use crate::types::{
     BulkRenameResult, DependenciesResult, FileEntry, FileMetadata, FileOperationResult,
     RenamePattern, RenamePreview,
@@ -88,15 +89,14 @@ pub async fn execute_bulk_rename(
         let has_conflicts = previews.iter().any(|p| p.conflict);
 
         if has_errors {
-            let errors: Vec<String> = previews
-                .iter()
-                .filter_map(|p| p.error.clone())
-                .collect();
+            let errors: Vec<String> = previews.iter().filter_map(|p| p.error.clone()).collect();
             return Err(format!("Validation errors: {}", errors.join(", ")));
         }
 
         if has_conflicts {
-            return Err("Naming conflicts detected. Enable auto-rename or fix manually.".to_string());
+            return Err(
+                "Naming conflicts detected. Enable auto-rename or fix manually.".to_string(),
+            );
         }
 
         // Execute renames
@@ -142,4 +142,22 @@ pub async fn create_folders_from_selection(
     })
     .await
     .map_err(|e| format!("Task join error: {}", e))?
+}
+
+#[tauri::command]
+pub async fn apply_filters(
+    current_dir: String,
+    filters: FilterCriteria,
+) -> Result<FilterResult, String> {
+    // Run in blocking task to avoid blocking UI thread (media filters may call ffprobe)
+    tokio::task::spawn_blocking(move || files::apply_filters(current_dir, filters))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
+}
+
+#[tauri::command]
+pub async fn get_available_extensions(current_dir: String) -> Result<Vec<String>, String> {
+    tokio::task::spawn_blocking(move || files::get_available_extensions(current_dir))
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
 }

@@ -1499,11 +1499,7 @@ mod tests {
 
     #[test]
     fn test_extrapolate_multiple_samples() {
-        let sampled = vec![
-            (1.0, 5000, None),
-            (2.0, 6000, None),
-            (50.0, 7000, None),
-        ];
+        let sampled = vec![(1.0, 5000, None), (2.0, 6000, None), (50.0, 7000, None)];
         let result = extrapolate_sampled_data(&sampled, 10.0, 100.0, 1.0);
         assert_eq!(result.len(), 100);
 
@@ -1525,7 +1521,7 @@ mod tests {
         // But intervals with actual data still compute bitrate from their data
         // Interval 1 has the sample, so it has non-zero bitrate
         assert_eq!(result[1].bitrate, 40000); // 5000 * 8 / 1.0
-        // Other intervals use avg_bitrate which is 0
+                                              // Other intervals use avg_bitrate which is 0
         assert_eq!(result[0].bitrate, 0);
         assert_eq!(result[10].bitrate, 0);
     }

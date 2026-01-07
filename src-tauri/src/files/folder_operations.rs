@@ -11,7 +11,10 @@ use std::process::Command;
 use std::time::UNIX_EPOCH;
 
 /// Create folders per file (movie.mp4 → movie/movie.mp4)
-fn create_folder_per_file(paths: Vec<String>, parent: &str) -> Result<FolderCreationResult, String> {
+fn create_folder_per_file(
+    paths: Vec<String>,
+    parent: &str,
+) -> Result<FolderCreationResult, String> {
     let parent_path = Path::new(parent);
     let mut success = 0;
     let mut failed = 0;
@@ -117,9 +120,7 @@ fn create_grouped_folders(
     // Group files by criteria
     let groups = match criteria {
         GroupCriteria::Extension => group_by_extension(&paths)?,
-        GroupCriteria::DateModified { granularity } => {
-            group_by_date(&paths, granularity.as_str())?
-        }
+        GroupCriteria::DateModified { granularity } => group_by_date(&paths, granularity.as_str())?,
         GroupCriteria::MediaType => group_by_media_type(&paths)?,
         GroupCriteria::Resolution => group_by_resolution(&paths)?,
         GroupCriteria::Codec => group_by_codec(&paths)?,
@@ -178,14 +179,20 @@ fn group_by_extension(paths: &[String]) -> Result<HashMap<String, Vec<String>>, 
             .unwrap_or("no_extension")
             .to_lowercase();
 
-        groups.entry(ext).or_insert_with(Vec::new).push(path.clone());
+        groups
+            .entry(ext)
+            .or_insert_with(Vec::new)
+            .push(path.clone());
     }
 
     Ok(groups)
 }
 
 /// Group files by date modified
-fn group_by_date(paths: &[String], granularity: &str) -> Result<HashMap<String, Vec<String>>, String> {
+fn group_by_date(
+    paths: &[String],
+    granularity: &str,
+) -> Result<HashMap<String, Vec<String>>, String> {
     let mut groups: HashMap<String, Vec<String>> = HashMap::new();
 
     for path in paths {
@@ -518,10 +525,7 @@ mod tests {
 
     #[test]
     fn test_group_by_media_type_other() {
-        let paths = vec![
-            "/path/doc.pdf".to_string(),
-            "/path/img.jpg".to_string(),
-        ];
+        let paths = vec!["/path/doc.pdf".to_string(), "/path/img.jpg".to_string()];
         let result = group_by_media_type(&paths).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result["other"].len(), 2);
@@ -529,10 +533,7 @@ mod tests {
 
     #[test]
     fn test_group_by_media_type_case_insensitive() {
-        let paths = vec![
-            "/path/file1.MP4".to_string(),
-            "/path/file2.Mp3".to_string(),
-        ];
+        let paths = vec!["/path/file1.MP4".to_string(), "/path/file2.Mp3".to_string()];
         let result = group_by_media_type(&paths).unwrap();
         assert_eq!(result.len(), 2);
         assert_eq!(result["video"].len(), 1);

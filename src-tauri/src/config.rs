@@ -36,7 +36,9 @@ static CONFIG: Lazy<RwLock<AppConfig>> = Lazy::new(|| RwLock::new(AppConfig::def
 /// Validate that a path is within allowed directories
 /// Returns canonicalized path if valid, error otherwise
 pub fn validate_path(path: &Path) -> Result<PathBuf, String> {
-    let config = CONFIG.read().map_err(|e| format!("Config lock error: {}", e))?;
+    let config = CONFIG
+        .read()
+        .map_err(|e| format!("Config lock error: {}", e))?;
 
     // Canonicalize the path (resolves symlinks, .. , etc.)
     let canonical = path
@@ -45,7 +47,10 @@ pub fn validate_path(path: &Path) -> Result<PathBuf, String> {
 
     // If no allowed directories configured, prompt user to configure
     if config.allowed_directories.is_empty() {
-        return Err("No allowed directories configured. Please configure allowed directories in settings.".to_string());
+        return Err(
+            "No allowed directories configured. Please configure allowed directories in settings."
+                .to_string(),
+        );
     }
 
     // Check if path is within any allowed directory
@@ -66,7 +71,9 @@ pub fn validate_path(path: &Path) -> Result<PathBuf, String> {
 
 /// Add a directory to the whitelist
 pub fn add_allowed_directory(path: PathBuf) -> Result<(), String> {
-    let mut config = CONFIG.write().map_err(|e| format!("Config lock error: {}", e))?;
+    let mut config = CONFIG
+        .write()
+        .map_err(|e| format!("Config lock error: {}", e))?;
 
     let canonical = path
         .canonicalize()
@@ -85,7 +92,9 @@ pub fn add_allowed_directory(path: PathBuf) -> Result<(), String> {
 
 /// Remove a directory from the whitelist
 pub fn remove_allowed_directory(path: &Path) -> Result<(), String> {
-    let mut config = CONFIG.write().map_err(|e| format!("Config lock error: {}", e))?;
+    let mut config = CONFIG
+        .write()
+        .map_err(|e| format!("Config lock error: {}", e))?;
 
     let canonical = path
         .canonicalize()
@@ -98,13 +107,17 @@ pub fn remove_allowed_directory(path: &Path) -> Result<(), String> {
 
 /// Get list of allowed directories
 pub fn get_allowed_directories() -> Result<Vec<PathBuf>, String> {
-    let config = CONFIG.read().map_err(|e| format!("Config lock error: {}", e))?;
+    let config = CONFIG
+        .read()
+        .map_err(|e| format!("Config lock error: {}", e))?;
     Ok(config.allowed_directories.clone())
 }
 
 /// Set allowed directories (replaces existing list)
 pub fn set_allowed_directories(directories: Vec<PathBuf>) -> Result<(), String> {
-    let mut config = CONFIG.write().map_err(|e| format!("Config lock error: {}", e))?;
+    let mut config = CONFIG
+        .write()
+        .map_err(|e| format!("Config lock error: {}", e))?;
 
     // Validate all directories exist and are accessible
     let mut validated = Vec::new();

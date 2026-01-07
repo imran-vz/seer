@@ -11,7 +11,7 @@ pub const MEDIA_EXTENSIONS: &[&str] = &[
     "wma", "m4a", "opus", "jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "heic",
 ];
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FileEntry {
     pub name: String,
     pub path: String,

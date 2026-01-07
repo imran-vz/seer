@@ -12,14 +12,15 @@ import {
 	Move,
 	Pencil,
 	RefreshCw,
-	TextCursorInput,
 	Trash,
 	Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
+import { BulkActionsBar } from "@/components/BulkActionsBar";
 import { BulkRenameDialog } from "@/components/BulkRenameDialog";
 import { BulkStreamCleanupDialog } from "@/components/BulkStreamCleanupDialog";
+import { FilterPanel } from "@/components/FilterPanel";
 import { FolderCreationDialog } from "@/components/FolderCreationDialog";
 import {
 	AlertDialog,
@@ -101,6 +102,29 @@ export function FileBrowser() {
 	const [folderCreationDialogOpen, setFolderCreationDialogOpen] =
 		useState(false);
 	const [operationError, setOperationError] = useState<string | null>(null);
+	const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+	const [filteredFiles, setFilteredFiles] = useState<FileEntry[] | null>(null);
+
+	// Handle filter results
+	const handleFilterApplied = useCallback(
+		(
+			result: {
+				files: FileEntry[];
+				total_count: number;
+				filtered_count: number;
+			} | null,
+		) => {
+			if (result === null) {
+				setFilteredFiles(null);
+			} else {
+				setFilteredFiles(result.files);
+			}
+		},
+		[],
+	);
+
+	// Use filtered files if available, otherwise use all files
+	const displayedFiles = filteredFiles ?? files;
 
 	const formatSize = (bytes: number): string => {
 		if (bytes === 0) return "-";
@@ -390,81 +414,37 @@ export function FileBrowser() {
 
 			{/* Bulk Actions Bar */}
 			{hasSelection && (
-				<div className="flex items-center gap-1.5 border-border border-b bg-primary/5 px-2 py-1.5">
-					<span className="px-1 font-medium text-primary text-xs">
-						{selectedPaths.size} selected
-					</span>
-					<div className="flex-1" />
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => setBulkRenameDialogOpen(true)}
-						className="h-7 text-xs"
-					>
-						<TextCursorInput className="mr-1 h-3.5 w-3.5" />
-						Rename
-					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => setFolderCreationDialogOpen(true)}
-						className="h-7 text-xs"
-					>
-						<FolderPlus className="mr-1 h-3.5 w-3.5" />
-						Create Folders
-					</Button>
-					{getMediaFilePaths().length > 0 && (
-						<Button
-							variant="ghost"
-							size="sm"
-							onClick={() => setBulkStreamCleanupDialogOpen(true)}
-							className="h-7 text-xs"
-						>
-							<Film className="mr-1 h-3.5 w-3.5" />
-							Clean Streams
-						</Button>
-					)}
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={openBulkMoveDialog}
-						className="h-7 text-xs"
-					>
-						<Move className="mr-1 h-3.5 w-3.5" />
-						Move
-					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={openBulkCopyDialog}
-						className="h-7 text-xs"
-					>
-						<Copy className="mr-1 h-3.5 w-3.5" />
-						Copy
-					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={openBulkDeleteDialog}
-						className="h-7 text-destructive text-xs hover:text-destructive"
-					>
-						<Trash className="mr-1 h-3.5 w-3.5" />
-						Delete
-					</Button>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={clearSelection}
-						className="h-7 text-xs"
-					>
-						Clear
-					</Button>
-				</div>
+				<BulkActionsBar
+					selectedCount={selectedPaths.size}
+					hasMediaFiles={getMediaFilePaths().length > 0}
+					onRename={() => setBulkRenameDialogOpen(true)}
+					onCreateFolders={() => setFolderCreationDialogOpen(true)}
+					onCleanStreams={() => setBulkStreamCleanupDialogOpen(true)}
+					onMove={openBulkMoveDialog}
+					onCopy={openBulkCopyDialog}
+					onDelete={openBulkDeleteDialog}
+					onClearSelection={clearSelection}
+				/>
 			)}
 
 			{error && (
 				<div className="bg-destructive/10 px-3 py-2 text-destructive text-xs">
 					{error}
+				</div>
+			)}
+
+			{/* Filter Panel */}
+			<FilterPanel
+				currentPath={currentPath}
+				isOpen={filterPanelOpen}
+				onToggle={() => setFilterPanelOpen(!filterPanelOpen)}
+				onFilterApplied={handleFilterApplied}
+			/>
+
+			{/* Filtered Results Info */}
+			{filteredFiles !== null && (
+				<div className="bg-muted/30 px-3 py-1 text-[11px] text-muted-foreground">
+					Showing {filteredFiles.length} of {files.length} items
 				</div>
 			)}
 
@@ -486,7 +466,7 @@ export function FileBrowser() {
 
 			<ScrollArea className="h-[calc(100%-6rem)] flex-1">
 				<div className="px-1 py-0.5">
-					{files.map((file) => (
+					{displayedFiles.map((file) => (
 						<ContextMenu key={file.path}>
 							<ContextMenuTrigger asChild>
 								{/** biome-ignore lint/a11y/noStaticElementInteractions: need for context menu */}

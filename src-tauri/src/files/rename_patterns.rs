@@ -10,12 +10,7 @@ use std::path::Path;
 use std::process::Command;
 
 /// Apply find & replace to a filename
-pub fn apply_find_replace(
-    name: &str,
-    find: &str,
-    replace: &str,
-    case_sensitive: bool,
-) -> String {
+pub fn apply_find_replace(name: &str, find: &str, replace: &str, case_sensitive: bool) -> String {
     if find.is_empty() {
         return name.to_string();
     }
@@ -52,29 +47,21 @@ pub fn apply_sequential_numbering(
 
     for (i, path) in paths.iter().enumerate() {
         let path_obj = Path::new(path);
-        let original_name = path_obj
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("");
+        let original_name = path_obj.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
         // Get extension if exists
-        let ext = path_obj
-            .extension()
-            .and_then(|e| e.to_str())
-            .unwrap_or("");
+        let ext = path_obj.extension().and_then(|e| e.to_str()).unwrap_or("");
 
         // Get filename stem (without extension)
-        let stem = path_obj
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("");
+        let stem = path_obj.file_stem().and_then(|s| s.to_str()).unwrap_or("");
 
         // Calculate number
         let number = start + i;
         let number_str = format!("{:0width$}", number, width = padding);
 
         // Replace all placeholders
-        let has_placeholders = pattern.contains("{n}") || pattern.contains("{name}") || pattern.contains("{ext}");
+        let has_placeholders =
+            pattern.contains("{n}") || pattern.contains("{name}") || pattern.contains("{ext}");
 
         let new_name = if has_placeholders {
             pattern
@@ -109,7 +96,8 @@ pub fn apply_case_transform(name: &str, mode: &CaseMode) -> String {
                     match chars.next() {
                         None => String::new(),
                         Some(first) => {
-                            first.to_uppercase().collect::<String>() + &chars.as_str().to_lowercase()
+                            first.to_uppercase().collect::<String>()
+                                + &chars.as_str().to_lowercase()
                         }
                     }
                 })
@@ -186,15 +174,9 @@ pub fn apply_template(
 ) -> Result<String, String> {
     let path_obj = Path::new(path);
 
-    let original_name = path_obj
-        .file_stem()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+    let original_name = path_obj.file_stem().and_then(|n| n.to_str()).unwrap_or("");
 
-    let ext = path_obj
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("");
+    let ext = path_obj.extension().and_then(|e| e.to_str()).unwrap_or("");
 
     let parent = path_obj
         .parent()
@@ -216,7 +198,10 @@ pub fn apply_template(
     result = result.replace("{parent}", parent);
 
     // Replace media variables if needed
-    if result.contains("{type}") || result.contains("{video_codec}") || result.contains("{audio_codec}") {
+    if result.contains("{type}")
+        || result.contains("{video_codec}")
+        || result.contains("{audio_codec}")
+    {
         if let Some((file_type, video_codec, audio_codec)) = get_media_metadata(path) {
             result = result.replace("{type}", &file_type);
             result = result.replace("{video_codec}", video_codec.as_deref().unwrap_or("unknown"));
@@ -246,7 +231,10 @@ fn resolve_conflict(base_name: &str, existing: &HashSet<String>) -> String {
     // Split into name and extension
     let path = Path::new(base_name);
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or(base_name);
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or(base_name);
 
     // Try appending (1), (2), etc.
     for i in 1..10000 {
@@ -293,7 +281,8 @@ pub fn preview_renames(
                     .unwrap_or("")
                     .to_string();
 
-                let mut new_name = apply_find_replace(&original_name, &find, &replace, case_sensitive);
+                let mut new_name =
+                    apply_find_replace(&original_name, &find, &replace, case_sensitive);
 
                 // Check for conflicts
                 let mut conflict = seen_names.contains(&new_name);
@@ -549,10 +538,7 @@ mod tests {
 
     #[test]
     fn test_sequential_with_name_placeholder() {
-        let paths = vec![
-            "/path/movie.mp4".to_string(),
-            "/path/show.mp4".to_string(),
-        ];
+        let paths = vec!["/path/movie.mp4".to_string(), "/path/show.mp4".to_string()];
         let result = apply_sequential_numbering(&paths, "{name}_{n}.{ext}", 1, 2);
         assert_eq!(result[&paths[0]], "movie_01.mp4");
         assert_eq!(result[&paths[1]], "show_02.mp4");
@@ -567,10 +553,7 @@ mod tests {
 
     #[test]
     fn test_sequential_start_value() {
-        let paths = vec![
-            "/path/file.mp4".to_string(),
-            "/path/file2.mp4".to_string(),
-        ];
+        let paths = vec!["/path/file.mp4".to_string(), "/path/file2.mp4".to_string()];
         let result = apply_sequential_numbering(&paths, "{n}.{ext}", 10, 2);
         assert_eq!(result[&paths[0]], "10.mp4");
         assert_eq!(result[&paths[1]], "11.mp4");
@@ -578,10 +561,7 @@ mod tests {
 
     #[test]
     fn test_sequential_padding() {
-        let paths = vec![
-            "/path/file.mp4".to_string(),
-            "/path/file2.mp4".to_string(),
-        ];
+        let paths = vec!["/path/file.mp4".to_string(), "/path/file2.mp4".to_string()];
         let result = apply_sequential_numbering(&paths, "{n}.{ext}", 1, 5);
         assert_eq!(result[&paths[0]], "00001.mp4");
         assert_eq!(result[&paths[1]], "00002.mp4");
@@ -735,13 +715,7 @@ mod tests {
 
     #[test]
     fn test_template_all_vars() {
-        let result = apply_template(
-            "/videos/file.mp4",
-            "{index}_{counter}_{name}",
-            3,
-            10,
-        )
-        .unwrap();
+        let result = apply_template("/videos/file.mp4", "{index}_{counter}_{name}", 3, 10).unwrap();
         assert_eq!(result, "3_10_file.mp4");
     }
 }

@@ -61,6 +61,8 @@ pub fn run() {
             commands::preview_bulk_rename,
             commands::execute_bulk_rename,
             commands::create_folders_from_selection,
+            commands::apply_filters,
+            commands::get_available_extensions,
             // Media operations
             commands::get_media_streams,
             commands::remove_streams,
