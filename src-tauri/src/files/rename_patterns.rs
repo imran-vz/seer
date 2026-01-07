@@ -718,4 +718,284 @@ mod tests {
         let result = apply_template("/videos/file.mp4", "{index}_{counter}_{name}", 3, 10).unwrap();
         assert_eq!(result, "3_10_file.mp4");
     }
+
+    // ========== preview_renames tests ==========
+
+    #[test]
+    fn test_preview_find_replace_basic() {
+        let paths = vec!["/path/old_file.mp4".to_string()];
+        let pattern = RenamePattern::FindReplace {
+            find: "old".to_string(),
+            replace: "new".to_string(),
+            case_sensitive: true,
+        };
+        let result = preview_renames(paths, pattern, false).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].original_name, "old_file.mp4");
+        assert_eq!(result[0].new_name, "new_file.mp4");
+        assert!(!result[0].conflict);
+    }
+
+    #[test]
+    fn test_preview_find_replace_conflict_detection() {
+        let paths = vec![
+            "/path/file_a.mp4".to_string(),
+            "/path/file_b.mp4".to_string(),
+        ];
+        // Both will become "file_.mp4" after replacing a/b with empty
+        let pattern = RenamePattern::FindReplace {
+            find: "a".to_string(),
+            replace: "".to_string(),
+            case_sensitive: true,
+        };
+        let result = preview_renames(paths.clone(), pattern.clone(), false).unwrap();
+        // First file: no conflict (first occurrence)
+        assert!(!result[0].conflict);
+        // Second file with same pattern might not conflict if 'b' isn't matched
+        // Let's use a better example
+        let paths2 = vec![
+            "/path/test_a.mp4".to_string(),
+            "/path/test_b.mp4".to_string(),
+        ];
+        let pattern2 = RenamePattern::FindReplace {
+            find: "_a".to_string(),
+            replace: "".to_string(),
+            case_sensitive: true,
+        };
+        let result2 = preview_renames(paths2, pattern2, false).unwrap();
+        assert_eq!(result2[0].new_name, "test.mp4");
+        assert_eq!(result2[1].new_name, "test_b.mp4");
+    }
+
+    #[test]
+    fn test_preview_find_replace_auto_rename() {
+        let paths = vec![
+            "/path/video.mp4".to_string(),
+            "/path/VIDEO.mp4".to_string(),
+        ];
+        let pattern = RenamePattern::CaseTransform {
+            mode: CaseMode::Lowercase,
+        };
+        // Without auto_rename_conflicts, second should have conflict
+        let result_no_auto = preview_renames(paths.clone(), pattern.clone(), false).unwrap();
+        assert!(!result_no_auto[0].conflict);
+        assert!(result_no_auto[1].conflict);
+
+        // With auto_rename_conflicts, should auto-resolve
+        let result_auto = preview_renames(paths, pattern, true).unwrap();
+        assert!(!result_auto[0].conflict);
+        assert!(!result_auto[1].conflict);
+        assert_eq!(result_auto[1].new_name, "video (1).mp4");
+    }
+
+    #[test]
+    fn test_preview_sequential_basic() {
+        let paths = vec![
+            "/path/a.mp4".to_string(),
+            "/path/b.mp4".to_string(),
+            "/path/c.mp4".to_string(),
+        ];
+        let pattern = RenamePattern::Sequential {
+            pattern: "episode_{n}.{ext}".to_string(),
+            start: 1,
+            padding: 2,
+        };
+        let result = preview_renames(paths, pattern, false).unwrap();
+        assert_eq!(result[0].new_name, "episode_01.mp4");
+        assert_eq!(result[1].new_name, "episode_02.mp4");
+        assert_eq!(result[2].new_name, "episode_03.mp4");
+    }
+
+    #[test]
+    fn test_preview_sequential_preserves_original_paths() {
+        let paths = vec!["/videos/movie.mp4".to_string()];
+        let pattern = RenamePattern::Sequential {
+            pattern: "{n}.{ext}".to_string(),
+            start: 1,
+            padding: 3,
+        };
+        let result = preview_renames(paths, pattern, false).unwrap();
+        assert_eq!(result[0].original_path, "/videos/movie.mp4");
+        assert_eq!(result[0].new_path, "/videos/001.mp4");
+    }
+
+    #[test]
+    fn test_preview_case_transform_all_modes() {
+        let paths = vec!["/path/Test File.mp4".to_string()];
+
+        // Lowercase
+        let lower = preview_renames(
+            paths.clone(),
+            RenamePattern::CaseTransform {
+                mode: CaseMode::Lowercase,
+            },
+            false,
+        )
+        .unwrap();
+        assert_eq!(lower[0].new_name, "test file.mp4");
+
+        // Uppercase
+        let upper = preview_renames(
+            paths.clone(),
+            RenamePattern::CaseTransform {
+                mode: CaseMode::Uppercase,
+            },
+            false,
+        )
+        .unwrap();
+        assert_eq!(upper[0].new_name, "TEST FILE.MP4");
+
+        // TitleCase
+        let title = preview_renames(
+            paths,
+            RenamePattern::CaseTransform {
+                mode: CaseMode::TitleCase,
+            },
+            false,
+        )
+        .unwrap();
+        assert_eq!(title[0].new_name, "Test File.mp4");
+    }
+
+    #[test]
+    fn test_preview_template_basic() {
+        let paths = vec![
+            "/videos/movie.mp4".to_string(),
+            "/videos/show.mp4".to_string(),
+        ];
+        let pattern = RenamePattern::Template {
+            template: "{counter}_{name}".to_string(),
+        };
+        let result = preview_renames(paths, pattern, false).unwrap();
+        assert_eq!(result[0].new_name, "1_movie.mp4");
+        assert_eq!(result[1].new_name, "2_show.mp4");
+    }
+
+    #[test]
+    fn test_preview_empty_paths() {
+        let paths: Vec<String> = vec![];
+        let pattern = RenamePattern::FindReplace {
+            find: "old".to_string(),
+            replace: "new".to_string(),
+            case_sensitive: true,
+        };
+        let result = preview_renames(paths, pattern, false).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_preview_new_path_calculation() {
+        let paths = vec!["/home/user/videos/test.mp4".to_string()];
+        let pattern = RenamePattern::FindReplace {
+            find: "test".to_string(),
+            replace: "demo".to_string(),
+            case_sensitive: true,
+        };
+        let result = preview_renames(paths, pattern, false).unwrap();
+        assert_eq!(result[0].new_path, "/home/user/videos/demo.mp4");
+    }
+
+    // ========== Edge cases and error handling ==========
+
+    #[test]
+    fn test_find_replace_empty_result() {
+        // Replacing entire name with empty string should flag error
+        let paths = vec!["/path/test.mp4".to_string()];
+        let pattern = RenamePattern::FindReplace {
+            find: "test.mp4".to_string(),
+            replace: "".to_string(),
+            case_sensitive: true,
+        };
+        let result = preview_renames(paths, pattern, false).unwrap();
+        assert!(result[0].error.is_some());
+        assert!(result[0].error.as_ref().unwrap().contains("empty"));
+    }
+
+    #[test]
+    fn test_find_replace_unicode() {
+        let result = apply_find_replace("文件_test.mp4", "文件", "档案", true);
+        assert_eq!(result, "档案_test.mp4");
+    }
+
+    #[test]
+    fn test_case_transform_unicode() {
+        // Test uppercase with unicode
+        let result = apply_case_transform("café.mp4", &CaseMode::Uppercase);
+        assert_eq!(result, "CAFÉ.MP4");
+    }
+
+    #[test]
+    fn test_sequential_large_numbers() {
+        let paths = vec!["/path/file.mp4".to_string()];
+        let result = apply_sequential_numbering(&paths, "{n}.{ext}", 999, 4);
+        assert_eq!(result[&paths[0]], "0999.mp4");
+    }
+
+    #[test]
+    fn test_sequential_zero_start() {
+        let paths = vec!["/path/file.mp4".to_string()];
+        let result = apply_sequential_numbering(&paths, "{n}.{ext}", 0, 2);
+        assert_eq!(result[&paths[0]], "00.mp4");
+    }
+
+    #[test]
+    fn test_template_empty_parent() {
+        // Root file has empty parent
+        let result = apply_template("/file.mp4", "{parent}_{name}", 0, 1).unwrap();
+        assert_eq!(result, "_file.mp4");
+    }
+
+    #[test]
+    fn test_resolve_conflict_stress() {
+        // Test with many existing conflicts
+        let mut existing = HashSet::new();
+        for i in 0..100 {
+            if i == 0 {
+                existing.insert("file.mp4".to_string());
+            } else {
+                existing.insert(format!("file ({}).mp4", i));
+            }
+        }
+        let result = resolve_conflict("file.mp4", &existing);
+        assert_eq!(result, "file (100).mp4");
+    }
+
+    #[test]
+    fn test_preview_maintains_order() {
+        // Ensure output order matches input order
+        let paths = vec![
+            "/path/c.mp4".to_string(),
+            "/path/a.mp4".to_string(),
+            "/path/b.mp4".to_string(),
+        ];
+        let pattern = RenamePattern::Sequential {
+            pattern: "{n}_{name}.{ext}".to_string(),
+            start: 1,
+            padding: 1,
+        };
+        let result = preview_renames(paths.clone(), pattern, false).unwrap();
+        assert_eq!(result[0].original_path, paths[0]);
+        assert_eq!(result[1].original_path, paths[1]);
+        assert_eq!(result[2].original_path, paths[2]);
+    }
+
+    #[test]
+    fn test_find_replace_no_match() {
+        let result = apply_find_replace("test.mp4", "xyz", "abc", true);
+        assert_eq!(result, "test.mp4");
+    }
+
+    #[test]
+    fn test_find_replace_partial_overlap() {
+        // "aaa" replaced in "aaaa" should give "aba"
+        let result = apply_find_replace("aaaa", "aa", "b", true);
+        assert_eq!(result, "bb");
+    }
+
+    #[test]
+    fn test_sequential_empty_extension() {
+        let paths = vec!["/path/file".to_string()];
+        let result = apply_sequential_numbering(&paths, "{name}_{n}", 1, 2);
+        assert_eq!(result[&paths[0]], "file_01");
+    }
 }
