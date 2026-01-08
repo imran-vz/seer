@@ -1,0 +1,22 @@
+# VitePress cache (build artifacts, not needed for deployment)
+docs/.vitepress/cache
+
+# Dependencies
+node_modules
+
+# Tauri/Rust (not needed for docs deployment)
+src-tauri
+target
+
+# Development files
+.DS_Store
+*.log
+.env
+.env.*
+
+# IDE
+.vscode
+.idea
+
+# Git
+.git
