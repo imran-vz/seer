@@ -22,7 +22,7 @@ tag: version
 		exit 1; \
 	fi
 	@echo "Checking for changes..."
-	@git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+	@git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json src-tauri/Cargo.lock
 	@if git diff --cached --quiet; then \
 		echo "No version changes detected - version already $(VERSION)"; \
 	else \
