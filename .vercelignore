@@ -17,6 +17,3 @@ target
 # IDE
 .vscode
 .idea
-
-# Git
-.git
