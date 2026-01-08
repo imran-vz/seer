@@ -488,7 +488,7 @@ export function BulkRenameDialog({
 															</span>
 														</div>
 														{preview.error && (
-															<div className="break-words text-[10px] text-destructive">
+															<div className="wrap-break-word text-[10px] text-destructive">
 																{preview.error}
 															</div>
 														)}
