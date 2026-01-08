@@ -390,9 +390,6 @@ pub fn copy_file(path: String, destination: String) -> Result<FileOperationResul
     let new_path = validated_dest.join(file_name);
     debug!("Copy destination path: {:?}", new_path);
 
-    // Validate final destination path
-    config::validate_path(&new_path)?;
-
     if new_path.exists() {
         warn!(
             "Copy failed: destination file already exists: {:?}",

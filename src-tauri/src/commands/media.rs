@@ -2,8 +2,9 @@
 //!
 //! This module contains all Tauri commands for media operations.
 
-use log::info;
+use log::{debug, info};
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use tauri::Emitter;
 
 use crate::bitrate::compute_file_hash;
@@ -97,6 +98,10 @@ pub async fn bulk_remove_streams(
     let mut errors = Vec::new();
     let mut jobs_queued = 0;
 
+    // Collect jobs to spawn
+    let mut jobs_to_spawn: Vec<(String, Vec<i32>, bool, Arc<std::sync::atomic::AtomicBool>)> =
+        Vec::new();
+
     for op in operations {
         let path = op.path.clone();
         let stream_indices = op.stream_indices;
@@ -122,6 +127,11 @@ pub async fn bulk_remove_streams(
             JobStartResult::Started(id) | JobStartResult::Queued(id) => {
                 job_ids.push(id);
                 jobs_queued += 1;
+
+                // Get cancellation flag for the job
+                if let Some(cancel_flag) = jobs::get_job_cancel_flag(&path) {
+                    jobs_to_spawn.push((path, stream_indices, overwrite, cancel_flag));
+                }
             }
             JobStartResult::AlreadyExists(job_id) => {
                 errors.push(format!(
@@ -142,6 +152,77 @@ pub async fn bulk_remove_streams(
         jobs_queued,
         errors.len()
     );
+
+    // Spawn workers for all jobs
+    for (path, stream_indices, overwrite, cancelled) in jobs_to_spawn {
+        let window_clone = window.clone();
+        let path_clone = path.clone();
+
+        tauri::async_runtime::spawn(async move {
+            // Wait until this job is actually running (not just queued)
+            loop {
+                if cancelled.load(Ordering::SeqCst) {
+                    debug!("Job cancelled before starting: {}", path_clone);
+                    jobs::complete_job(&path_clone);
+                    window_clone
+                        .emit("job-queue-update", jobs::get_queue_status())
+                        .ok();
+                    return;
+                }
+
+                // Check if this job is in the running state
+                if let Some(job_type) = jobs::get_job_details(&path_clone) {
+                    if matches!(job_type, JobType::StreamRemoval { .. }) {
+                        break; // Job is running, proceed with work
+                    }
+                }
+
+                // Wait a bit before checking again
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+
+            debug!("Starting stream removal worker for: {}", path_clone);
+
+            let path_for_work = path_clone.clone();
+            let cancelled_clone = cancelled.clone();
+
+            // Run the actual work in a blocking thread
+            let result = tauri::async_runtime::spawn_blocking(move || {
+                if cancelled_clone.load(Ordering::SeqCst) {
+                    return Err("Stream removal cancelled".to_string());
+                }
+
+                info!(
+                    "Executing stream removal: path={}, streams={:?}",
+                    path_for_work, stream_indices
+                );
+
+                media::remove_streams(path_for_work, stream_indices, overwrite)
+            })
+            .await;
+
+            // Complete the job
+            jobs::complete_job(&path_clone);
+
+            // Emit queue update
+            window_clone
+                .emit("job-queue-update", jobs::get_queue_status())
+                .ok();
+
+            // Log result
+            match result {
+                Ok(Ok(_)) => {
+                    info!("Stream removal completed successfully: {}", path_clone);
+                }
+                Ok(Err(e)) => {
+                    info!("Stream removal failed for {}: {}", path_clone, e);
+                }
+                Err(e) => {
+                    info!("Stream removal task failed for {}: {}", path_clone, e);
+                }
+            }
+        });
+    }
 
     Ok(BulkStreamRemovalResult {
         jobs_queued,

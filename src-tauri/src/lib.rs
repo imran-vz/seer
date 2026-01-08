@@ -40,6 +40,7 @@ pub fn run() {
                     }),
                 ])
                 .level(log::LevelFilter::Debug)
+                .timezone_strategy(tauri_plugin_log::TimezoneStrategy::UseLocal)
                 .build(),
         )
         .setup(|app| {

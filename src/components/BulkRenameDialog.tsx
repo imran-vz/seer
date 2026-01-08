@@ -208,7 +208,7 @@ export function BulkRenameDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="flex max-h-[85vh] max-w-4xl flex-col">
+			<DialogContent className="flex h-[85vh] max-w-4xl flex-col overflow-hidden">
 				<DialogHeader>
 					<DialogTitle>Bulk Rename ({paths.length} files)</DialogTitle>
 					<DialogDescription>
@@ -219,7 +219,7 @@ export function BulkRenameDialog({
 				<Tabs
 					value={tab}
 					onValueChange={(v) => setTab(v as typeof tab)}
-					className="flex min-h-0 flex-1 flex-col"
+					className="flex min-h-0 flex-1 flex-col overflow-hidden"
 				>
 					<TabsList className="grid w-full grid-cols-4">
 						<TabsTrigger value="find_replace">Find & Replace</TabsTrigger>
@@ -228,7 +228,7 @@ export function BulkRenameDialog({
 						<TabsTrigger value="template">Template</TabsTrigger>
 					</TabsList>
 
-					<div className="flex min-h-0 flex-1 flex-col gap-4 pt-4">
+					<div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden pt-4">
 						<TabsContent value="find_replace" className="mt-0">
 							<div className="space-y-3">
 								<div>
@@ -421,8 +421,8 @@ export function BulkRenameDialog({
 						</TabsContent>
 
 						{/* Preview section - takes remaining space */}
-						<div className="flex min-h-0 flex-1 flex-col rounded-md border">
-							<div className="flex items-center justify-between border-b bg-muted/40 p-3">
+						<div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-md border">
+							<div className="flex shrink-0 items-center justify-between border-b bg-muted/40 p-3">
 								<h3 className="font-medium text-sm">Preview</h3>
 								<div className="flex items-center space-x-2">
 									<Checkbox
@@ -440,67 +440,69 @@ export function BulkRenameDialog({
 									</label>
 								</div>
 							</div>
-							<ScrollArea className="flex-1">
-								<div className="space-y-1 p-2">
-									{loading && (
-										<div className="py-8 text-center text-muted-foreground text-sm">
-											Generating preview...
-										</div>
-									)}
-									{!loading && previews.length === 0 && (
-										<div className="py-8 text-center text-muted-foreground text-sm">
-											No files to rename
-										</div>
-									)}
-									{!loading &&
-										previews.map((preview) => (
-											<div
-												key={preview.original_path}
-												className={cn(
-													"flex items-center gap-2 rounded p-2 text-xs",
-													preview.conflict && "bg-destructive/10",
-													preview.error && "bg-destructive/10",
-													!preview.conflict &&
-														!preview.error &&
-														"hover:bg-muted/50",
-												)}
-											>
-												{preview.conflict || preview.error ? (
-													<AlertCircle className="h-3.5 w-3.5 shrink-0 text-destructive" />
-												) : (
-													<Check className="h-3.5 w-3.5 shrink-0 text-green-600" />
-												)}
-												<div className="min-w-0 flex-1 space-y-0.5">
-													<div className="flex flex-wrap items-center gap-2">
-														<span className="break-all text-muted-foreground">
-															{preview.original_name}
-														</span>
-														<X className="h-3 w-3 shrink-0" />
-														<span
-															className={cn(
-																"break-all font-medium",
-																(preview.conflict || preview.error) &&
-																	"text-destructive",
-															)}
-														>
-															{preview.new_name}
-														</span>
-													</div>
-													{preview.error && (
-														<div className="break-words text-[10px] text-destructive">
-															{preview.error}
-														</div>
-													)}
-													{preview.conflict && (
-														<div className="text-[10px] text-destructive">
-															Name conflict detected
-														</div>
-													)}
-												</div>
+							<div className="min-h-0 flex-1 overflow-hidden">
+								<ScrollArea className="h-full">
+									<div className="space-y-1 p-2">
+										{loading && (
+											<div className="py-8 text-center text-muted-foreground text-sm">
+												Generating preview...
 											</div>
-										))}
-								</div>
-							</ScrollArea>
+										)}
+										{!loading && previews.length === 0 && (
+											<div className="py-8 text-center text-muted-foreground text-sm">
+												No files to rename
+											</div>
+										)}
+										{!loading &&
+											previews.map((preview) => (
+												<div
+													key={preview.original_path}
+													className={cn(
+														"flex items-center gap-2 rounded p-2 text-xs",
+														preview.conflict && "bg-destructive/10",
+														preview.error && "bg-destructive/10",
+														!preview.conflict &&
+															!preview.error &&
+															"hover:bg-muted/50",
+													)}
+												>
+													{preview.conflict || preview.error ? (
+														<AlertCircle className="h-3.5 w-3.5 shrink-0 text-destructive" />
+													) : (
+														<Check className="h-3.5 w-3.5 shrink-0 text-green-600" />
+													)}
+													<div className="min-w-0 flex-1 space-y-0.5">
+														<div className="flex flex-wrap items-center gap-2">
+															<span className="break-all text-muted-foreground">
+																{preview.original_name}
+															</span>
+															<X className="h-3 w-3 shrink-0" />
+															<span
+																className={cn(
+																	"break-all font-medium",
+																	(preview.conflict || preview.error) &&
+																		"text-destructive",
+																)}
+															>
+																{preview.new_name}
+															</span>
+														</div>
+														{preview.error && (
+															<div className="break-words text-[10px] text-destructive">
+																{preview.error}
+															</div>
+														)}
+														{preview.conflict && (
+															<div className="text-[10px] text-destructive">
+																Name conflict detected
+															</div>
+														)}
+													</div>
+												</div>
+											))}
+									</div>
+								</ScrollArea>
+							</div>
 						</div>
 					</div>
 				</Tabs>

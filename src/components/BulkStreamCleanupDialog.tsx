@@ -1,8 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { ChevronDown, ChevronRight, Loader2, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Check, Clock, Loader2, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -78,8 +84,16 @@ interface FileStreamsData {
 	streams: MediaStreams | null;
 	loading: boolean;
 	error: string | null;
-	expanded: boolean;
 	selectedIndices: Set<number>;
+}
+
+type JobDisplayState = "queued" | "running" | "completed";
+
+interface JobDisplayInfo {
+	path: string;
+	state: JobDisplayState;
+	progress: number;
+	fileName: string;
 }
 
 interface BulkStreamCleanupDialogProps {
@@ -172,6 +186,13 @@ export function BulkStreamCleanupDialog({
 	);
 	const [executing, setExecuting] = useState(false);
 	const [queueStatus, setQueueStatus] = useState<QueueStatus | null>(null);
+	const [expandedItems, setExpandedItems] = useState<string[]>([]);
+	const [completedJobs, setCompletedJobs] = useState<Set<string>>(new Set());
+	const [totalJobsSubmitted, setTotalJobsSubmitted] = useState(0);
+	const [fakeProgress, setFakeProgress] = useState<Map<string, number>>(
+		new Map(),
+	);
+	const previousRunningPaths = useRef<Set<string>>(new Set());
 
 	// Load streams for all files
 	useEffect(() => {
@@ -186,11 +207,17 @@ export function BulkStreamCleanupDialog({
 					streams: null,
 					loading: true,
 					error: null,
-					expanded: paths.length === 1, // Auto-expand if single file
 					selectedIndices: new Set(),
 				});
 			}
 			setFilesData(newData);
+
+			// Auto-expand if single file
+			if (paths.length === 1) {
+				setExpandedItems([paths[0]]);
+			} else {
+				setExpandedItems([]);
+			}
 
 			// Load streams for each file
 			for (const path of paths) {
@@ -229,6 +256,27 @@ export function BulkStreamCleanupDialog({
 		if (!executing) return;
 
 		const unlisten = listen<QueueStatus>("job-queue-update", (event) => {
+			const currentRunningPaths = new Set(
+				event.payload.running.map((j) => j.path),
+			);
+			const currentQueuedPaths = new Set(
+				event.payload.queued.map((j) => j.path),
+			);
+
+			// Detect jobs that were running but are no longer running or queued (completed)
+			for (const path of previousRunningPaths.current) {
+				if (!currentRunningPaths.has(path) && !currentQueuedPaths.has(path)) {
+					setCompletedJobs((prev) => new Set(prev).add(path));
+					// Clear fake progress for completed job
+					setFakeProgress((prev) => {
+						const next = new Map(prev);
+						next.delete(path);
+						return next;
+					});
+				}
+			}
+
+			previousRunningPaths.current = currentRunningPaths;
 			setQueueStatus(event.payload);
 
 			// Check if all jobs are done
@@ -247,16 +295,27 @@ export function BulkStreamCleanupDialog({
 		};
 	}, [executing, onSuccess, onOpenChange]);
 
-	const toggleExpanded = (path: string) => {
-		setFilesData((prev) => {
-			const next = new Map(prev);
-			const fileData = next.get(path);
-			if (fileData) {
-				fileData.expanded = !fileData.expanded;
-			}
-			return next;
-		});
-	};
+	// Fake progress animation for running jobs
+	useEffect(() => {
+		if (!executing || !queueStatus) return;
+
+		const interval = setInterval(() => {
+			setFakeProgress((prev) => {
+				const next = new Map(prev);
+				for (const job of queueStatus.running) {
+					const current = next.get(job.path) ?? 0;
+					// Slowly grow to 60-70% range, slowing down as it approaches
+					if (current < 70) {
+						const increment = Math.max(0.5, (70 - current) / 20);
+						next.set(job.path, Math.min(70, current + increment));
+					}
+				}
+				return next;
+			});
+		}, 200);
+
+		return () => clearInterval(interval);
+	}, [executing, queueStatus]);
 
 	const toggleStream = (path: string, index: number) => {
 		setFilesData((prev) => {
@@ -350,6 +409,11 @@ export function BulkStreamCleanupDialog({
 
 		try {
 			setExecuting(true);
+			setCompletedJobs(new Set());
+			setFakeProgress(new Map());
+			setTotalJobsSubmitted(operations.length);
+			previousRunningPaths.current = new Set();
+
 			const result = await invoke<BulkStreamRemovalResult>(
 				"bulk_remove_streams",
 				{
@@ -378,9 +442,56 @@ export function BulkStreamCleanupDialog({
 	const totalSelected = getTotalSelected();
 	const hasAnyLoading = Array.from(filesData.values()).some((f) => f.loading);
 
+	// Build display list for all jobs
+	const getJobDisplayList = (): JobDisplayInfo[] => {
+		if (!queueStatus) return [];
+
+		const jobs: JobDisplayInfo[] = [];
+
+		// Add completed jobs first
+		for (const path of completedJobs) {
+			jobs.push({
+				path,
+				state: "completed",
+				progress: 100,
+				fileName: path.split("/").pop() || path,
+			});
+		}
+
+		// Add running jobs
+		for (const job of queueStatus.running) {
+			if (!completedJobs.has(job.path)) {
+				// Use fake progress since stream removal doesn't report real progress
+				const progress = fakeProgress.get(job.path) ?? 0;
+				jobs.push({
+					path: job.path,
+					state: "running",
+					progress,
+					fileName: job.path.split("/").pop() || job.path,
+				});
+			}
+		}
+
+		// Add queued jobs
+		for (const job of queueStatus.queued) {
+			if (!completedJobs.has(job.path)) {
+				jobs.push({
+					path: job.path,
+					state: "queued",
+					progress: 0,
+					fileName: job.path.split("/").pop() || job.path,
+				});
+			}
+		}
+
+		return jobs;
+	};
+
+	const completedCount = completedJobs.size;
+
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+			<DialogContent className="flex h-[80vh] w-full flex-col overflow-hidden sm:max-w-2xl">
 				<DialogHeader>
 					<DialogTitle>Clean Streams</DialogTitle>
 					<DialogDescription>
@@ -388,148 +499,188 @@ export function BulkStreamCleanupDialog({
 					</DialogDescription>
 				</DialogHeader>
 
-				{!executing && (
-					<div className="flex gap-2 flex-wrap">
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={() => applyPreset("subtitles")}
-							disabled={hasAnyLoading}
-						>
-							All Subtitles
-						</Button>
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={() => applyPreset("non-english-audio")}
-							disabled={hasAnyLoading}
-						>
-							Non-English Audio
-						</Button>
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={() => applyPreset("commentary")}
-							disabled={hasAnyLoading}
-						>
-							Commentary
-						</Button>
-						<Button
-							size="sm"
-							variant="outline"
-							onClick={() => applyPreset("cover-art")}
-							disabled={hasAnyLoading}
-						>
-							Cover Art
-						</Button>
-					</div>
-				)}
-
-				<ScrollArea className="flex-1 pr-4">
-					{executing ? (
-						<div className="space-y-4">
-							<p className="text-sm text-muted-foreground">
-								Processing {queueStatus?.running.length ?? 0} running,{" "}
-								{queueStatus?.queued.length ?? 0} queued
-							</p>
-							{queueStatus && (
-								<div className="space-y-2">
-									{queueStatus.running.map((job) => (
-										<div key={job.path} className="space-y-1">
-											<div className="flex items-center justify-between">
-												<p className="text-sm font-medium truncate flex-1">
-													{job.path.split("/").pop()}
-												</p>
-												{job.progress_percentage !== null &&
-													job.progress_percentage !== undefined && (
-														<span className="text-xs text-muted-foreground ml-2">
-															{Math.round(job.progress_percentage)}%
-														</span>
-													)}
-											</div>
-											{job.progress_percentage !== null && (
-												<div className="w-full bg-secondary rounded-full h-1.5">
-													<div
-														className="bg-primary h-1.5 rounded-full transition-all"
-														style={{ width: `${job.progress_percentage}%` }}
-													/>
-												</div>
-											)}
-										</div>
-									))}
-								</div>
-							)}
-						</div>
-					) : (
-						<div className="space-y-2">
-							{Array.from(filesData.values()).map((fileData) => (
-								<div key={fileData.path} className="border rounded-lg p-3">
-									<div
-										className="flex items-center gap-2 cursor-pointer"
-										onClick={() => toggleExpanded(fileData.path)}
-									>
-										{fileData.expanded ? (
-											<ChevronDown className="h-4 w-4" />
-										) : (
-											<ChevronRight className="h-4 w-4" />
-										)}
-										<span className="font-medium flex-1 truncate text-sm">
-											{fileData.path.split("/").pop()}
-										</span>
-										{fileData.loading && (
-											<Loader2 className="h-4 w-4 animate-spin" />
-										)}
-										{fileData.selectedIndices.size > 0 && (
-											<span className="text-xs text-muted-foreground">
-												{fileData.selectedIndices.size} selected
-											</span>
-										)}
-									</div>
-
-									{fileData.expanded && (
-										<div className="mt-3 ml-6 space-y-2">
-											{fileData.loading && (
-												<p className="text-sm text-muted-foreground">
-													Loading streams...
-												</p>
-											)}
-											{fileData.error && (
-												<p className="text-sm text-destructive">
-													{fileData.error}
-												</p>
-											)}
-											{fileData.streams && (
-												<div className="space-y-1">
-													{fileData.streams.streams.map((stream) => (
-														<div
-															key={stream.index}
-															className="flex items-center gap-2"
-														>
-															<Checkbox
-																checked={fileData.selectedIndices.has(
-																	stream.index,
-																)}
-																onCheckedChange={() =>
-																	toggleStream(fileData.path, stream.index)
-																}
-															/>
-															<label className="text-sm cursor-pointer flex-1">
-																<span className="font-mono text-xs text-muted-foreground mr-2">
-																	#{stream.index}
-																</span>
-																{formatStreamLabel(stream)}
-															</label>
-														</div>
-													))}
-												</div>
-											)}
-										</div>
-									)}
-								</div>
-							))}
+				<div className="flex min-h-0 flex-1 flex-col gap-y-4 overflow-hidden">
+					{!executing && (
+						<div className="flex flex-wrap gap-2">
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => applyPreset("subtitles")}
+								disabled={hasAnyLoading}
+							>
+								All Subtitles
+							</Button>
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => applyPreset("non-english-audio")}
+								disabled={hasAnyLoading}
+							>
+								Non-English Audio
+							</Button>
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => applyPreset("commentary")}
+								disabled={hasAnyLoading}
+							>
+								Commentary
+							</Button>
+							<Button
+								size="sm"
+								variant="outline"
+								onClick={() => applyPreset("cover-art")}
+								disabled={hasAnyLoading}
+							>
+								Cover Art
+							</Button>
 						</div>
 					)}
-				</ScrollArea>
+
+					<div className="min-h-0 flex-1 overflow-hidden">
+						<ScrollArea className="h-full">
+							{executing ? (
+								<div className="space-y-4">
+									<div className="flex items-center justify-between">
+										<p className="text-muted-foreground text-sm">
+											{queueStatus?.running.length ?? 0} running
+											{(queueStatus?.queued.length ?? 0) > 0 &&
+												`, ${queueStatus?.queued.length} queued`}
+										</p>
+										{totalJobsSubmitted > 0 && (
+											<p className="text-muted-foreground text-sm">
+												{Math.max(0, completedCount)}/{totalJobsSubmitted}{" "}
+												completed
+											</p>
+										)}
+									</div>
+									<div className="space-y-2">
+										{getJobDisplayList().map((job) => (
+											<div
+												key={job.path}
+												className={`space-y-1 rounded-md border p-2 transition-all ${
+													job.state === "completed"
+														? "border-green-500/50 bg-green-500/10"
+														: job.state === "running"
+															? "border-primary/50 bg-primary/5"
+															: "border-muted bg-muted/30"
+												}`}
+											>
+												<div className="flex items-center justify-between gap-2">
+													<div className="flex min-w-0 flex-1 items-center gap-2">
+														{job.state === "completed" ? (
+															<Check className="size-4 shrink-0 text-green-500" />
+														) : job.state === "running" ? (
+															<Loader2 className="size-4 shrink-0 animate-spin text-primary" />
+														) : (
+															<Clock className="size-4 shrink-0 text-muted-foreground" />
+														)}
+														<p className="flex-1 truncate font-medium text-sm">
+															{job.fileName}
+														</p>
+													</div>
+													<span className="shrink-0 text-muted-foreground text-xs">
+														{job.state === "completed"
+															? "Done"
+															: job.state === "queued"
+																? "Waiting..."
+																: `${Math.round(job.progress)}%`}
+													</span>
+												</div>
+												<div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+													{job.state === "completed" ? (
+														<div className="h-1.5 w-full rounded-full bg-green-500 transition-all" />
+													) : job.state === "running" ? (
+														<div
+															className="h-1.5 rounded-full bg-primary transition-all"
+															style={{ width: `${job.progress}%` }}
+														/>
+													) : (
+														<div className="h-1.5 w-full animate-pulse rounded-full bg-muted-foreground/20" />
+													)}
+												</div>
+											</div>
+										))}
+									</div>
+								</div>
+							) : (
+								<Accordion
+									type="multiple"
+									value={expandedItems}
+									onValueChange={setExpandedItems}
+									className="w-full space-y-2"
+								>
+									{Array.from(filesData.values()).map((fileData) => (
+										<AccordionItem
+											key={fileData.path}
+											value={fileData.path}
+											className="rounded-lg border px-3 last:border-b"
+										>
+											<AccordionTrigger className="gap-2 py-3 hover:no-underline">
+												<div className="flex flex-1 items-center gap-2">
+													<span className="flex-1 truncate text-left font-medium text-sm">
+														{fileData.path.split("/").pop()}
+													</span>
+													{fileData.loading && (
+														<Loader2 className="size-4 animate-spin" />
+													)}
+													{fileData.selectedIndices.size > 0 && (
+														<span className="text-muted-foreground text-xs">
+															{fileData.selectedIndices.size} selected
+														</span>
+													)}
+												</div>
+											</AccordionTrigger>
+											<AccordionContent>
+												<div className="space-y-2 pb-2">
+													{fileData.loading && (
+														<p className="text-muted-foreground text-sm">
+															Loading streams...
+														</p>
+													)}
+													{fileData.error && (
+														<p className="text-destructive text-sm">
+															{fileData.error}
+														</p>
+													)}
+													{fileData.streams && (
+														<div className="space-y-1">
+															{fileData.streams.streams.map((stream) => (
+																<div
+																	key={stream.index}
+																	className="flex items-center gap-2"
+																>
+																	<Checkbox
+																		id={`stream-${fileData.path}-${stream.index}`}
+																		checked={fileData.selectedIndices.has(
+																			stream.index,
+																		)}
+																		onCheckedChange={() =>
+																			toggleStream(fileData.path, stream.index)
+																		}
+																	/>
+																	<label
+																		htmlFor={`stream-${fileData.path}-${stream.index}`}
+																		className="flex-1 cursor-pointer text-sm"
+																	>
+																		<span className="mr-2 font-mono text-muted-foreground text-xs">
+																			#{stream.index}
+																		</span>
+																		{formatStreamLabel(stream)}
+																	</label>
+																</div>
+															))}
+														</div>
+													)}
+												</div>
+											</AccordionContent>
+										</AccordionItem>
+									))}
+								</Accordion>
+							)}
+						</ScrollArea>
+					</div>
+				</div>
 
 				<DialogFooter>
 					{executing ? (
@@ -545,7 +696,7 @@ export function BulkStreamCleanupDialog({
 								onClick={handleExecute}
 								disabled={totalSelected === 0 || hasAnyLoading}
 							>
-								<Trash2 className="h-4 w-4 mr-2" />
+								<Trash2 className="mr-2 size-4" />
 								Remove {totalSelected} Stream{totalSelected !== 1 ? "s" : ""}
 							</Button>
 						</>
