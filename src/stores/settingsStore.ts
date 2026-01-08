@@ -17,6 +17,7 @@ export interface AppSettings {
 	showHiddenFiles: boolean;
 	confirmBeforeDelete: boolean;
 	useTrashByDefault: boolean;
+	rightPanelVisible: boolean;
 
 	// Cache settings
 	enableCaching: boolean;
@@ -36,6 +37,7 @@ const defaultSettings: AppSettings = {
 	showHiddenFiles: false,
 	confirmBeforeDelete: true,
 	useTrashByDefault: true,
+	rightPanelVisible: true,
 
 	// Cache settings
 	enableCaching: true,
@@ -53,6 +55,7 @@ const keyMap: Record<keyof AppSettings, string> = {
 	showHiddenFiles: "show_hidden_files",
 	confirmBeforeDelete: "confirm_before_delete",
 	useTrashByDefault: "use_trash_by_default",
+	rightPanelVisible: "right_panel_visible",
 	enableCaching: "enable_caching",
 	cacheExpirationDays: "cache_expiration_days",
 	maxParallelJobs: "max_parallel_jobs",

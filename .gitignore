@@ -27,7 +27,10 @@ docs/.vitepress/dist
 *.sln
 *.sw?
 .mcp.json
-AGENTS.md
-CLAUDE.md
 actions-runner/
 .vercel
+
+*.md
+!docs/*md
+!README.md
+!ROADMAP.md

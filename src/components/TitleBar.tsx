@@ -1,5 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { JobIndicator } from "./JobIndicator";
+import { RightPanelToggle } from "./RightPanelToggle";
 import { SettingsDialog } from "./SettingsDialog";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
@@ -41,6 +42,7 @@ export function TitleBar() {
 			{/* Right side controls */}
 			<div data-no-drag className="flex items-center gap-1">
 				<JobIndicator />
+				<RightPanelToggle />
 				<SettingsDialog />
 				<ThemeSwitcher />
 			</div>

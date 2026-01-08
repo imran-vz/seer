@@ -7,10 +7,16 @@ import { FileBrowser } from "./components/FileBrowser";
 import { MetadataPanel } from "./components/MetadataPanel";
 import { StreamsPanel } from "./components/StreamsPanel";
 import { TitleBar } from "./components/TitleBar";
+import {
+	ResizableHandle,
+	ResizablePanel,
+	ResizablePanelGroup,
+} from "./components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { useAppInitialization } from "./hooks/useAppInitialization";
 import { isVideoOrAudioFile } from "./lib/fileUtils";
 import { useFileBrowserStore } from "./stores/fileBrowserStore";
+import { useSettingsStore } from "./stores/settingsStore";
 
 function LoadingScreen({
 	stage,
@@ -57,6 +63,9 @@ function App() {
 	const [activeTab, setActiveTab] = useState("metadata");
 	const selectedPath = useFileBrowserStore((state) => state.selectedPath);
 	const showBitrateTab = isVideoOrAudioFile(selectedPath);
+	const rightPanelVisible = useSettingsStore(
+		(state) => state.settings.rightPanelVisible,
+	);
 
 	// Centralized app initialization
 	const { stage, initialized, error } = useAppInitialization();
@@ -88,39 +97,61 @@ function App() {
 		<div className="app-container flex h-screen flex-col overflow-hidden">
 			<TitleBar />
 			<main className="flex flex-1 overflow-hidden">
-				{/* File Browser Panel */}
-				<div className="w-[55%] min-w-75 overflow-hidden">
-					<FileBrowser />
-				</div>
+				<ResizablePanelGroup direction="horizontal">
+					{/* File Browser Panel */}
+					<ResizablePanel
+						defaultSize={rightPanelVisible ? 55 : 100}
+						minSize={30}
+						className="overflow-hidden"
+					>
+						<FileBrowser />
+					</ResizablePanel>
 
-				{/* Right Panel */}
-				<Tabs
-					value={activeTab}
-					onValueChange={setActiveTab}
-					className="flex flex-1 flex-col overflow-hidden border-border/50 border-l bg-background"
-				>
-					<div className="border-border/50 border-b bg-muted/30 px-2 py-1.5">
-						<TabsList>
-							<TabsTrigger value="metadata">Metadata</TabsTrigger>
-							<TabsTrigger value="streams">Streams</TabsTrigger>
-							<TabsTrigger disabled={!showBitrateTab} value="bitrate">
-								Bitrate
-							</TabsTrigger>
-						</TabsList>
-					</div>
+					{/* Right Panel */}
+					{rightPanelVisible && (
+						<>
+							<ResizableHandle withHandle />
+							<ResizablePanel defaultSize={45} minSize={30}>
+								<Tabs
+									value={activeTab}
+									onValueChange={setActiveTab}
+									className="flex h-full flex-col overflow-hidden border-border/50 border-l bg-background"
+								>
+									<div className="border-border/50 border-b bg-muted/30 px-2 py-1.5">
+										<TabsList>
+											<TabsTrigger value="metadata">Metadata</TabsTrigger>
+											<TabsTrigger value="streams">Streams</TabsTrigger>
+											<TabsTrigger disabled={!showBitrateTab} value="bitrate">
+												Bitrate
+											</TabsTrigger>
+										</TabsList>
+									</div>
 
-					<TabsContent value="metadata" className="flex-1 overflow-hidden">
-						<MetadataPanel filePath={selectedPath} />
-					</TabsContent>
-					<TabsContent value="streams" className="flex-1 overflow-hidden">
-						<StreamsPanel filePath={selectedPath} />
-					</TabsContent>
-					{showBitrateTab && (
-						<TabsContent value="bitrate" className="flex-1 overflow-hidden">
-							<BitratePanel filePath={selectedPath} />
-						</TabsContent>
+									<TabsContent
+										value="metadata"
+										className="flex-1 overflow-hidden"
+									>
+										<MetadataPanel filePath={selectedPath} />
+									</TabsContent>
+									<TabsContent
+										value="streams"
+										className="flex-1 overflow-hidden"
+									>
+										<StreamsPanel filePath={selectedPath} />
+									</TabsContent>
+									{showBitrateTab && (
+										<TabsContent
+											value="bitrate"
+											className="flex-1 overflow-hidden"
+										>
+											<BitratePanel filePath={selectedPath} />
+										</TabsContent>
+									)}
+								</Tabs>
+							</ResizablePanel>
+						</>
 					)}
-				</Tabs>
+				</ResizablePanelGroup>
 			</main>
 			<Toaster richColors />
 		</div>

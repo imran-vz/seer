@@ -442,7 +442,9 @@ export const useFileBrowserStore = create<FileBrowserState>((set, get) => ({
 	// Get media file paths from selection
 	getMediaFilePaths: () => {
 		const { selectedPaths, files } = get();
-		const selectedFiles = files.filter(f => selectedPaths.has(f.path));
-		return selectedFiles.filter(f => f.is_media && !f.is_dir).map(f => f.path);
+		const selectedFiles = files.filter((f) => selectedPaths.has(f.path));
+		return selectedFiles
+			.filter((f) => f.is_media && !f.is_dir)
+			.map((f) => f.path);
 	},
 }));
