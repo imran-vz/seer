@@ -19,6 +19,28 @@ use crate::types::{MediaStreams, StreamInfo, StreamRemovalResult, StreamType};
 pub fn get_search_paths() -> Vec<String> {
     let mut paths: Vec<String> = Vec::new();
 
+    // PRIORITY: Check Seer's app data bin directory first (for directly installed tools)
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(appdata) = std::env::var("APPDATA") {
+            paths.push(format!(r"{}\Seer\bin", appdata));
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            paths.push(format!("{}/Library/Application Support/Seer/bin", home));
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            paths.push(format!("{}/.local/share/Seer/bin", home));
+        }
+    }
+
     #[cfg(target_os = "windows")]
     {
         // Windows common paths

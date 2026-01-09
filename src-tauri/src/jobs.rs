@@ -40,6 +40,10 @@ pub enum JobType {
         stream_indices: Vec<i32>,
         overwrite: bool,
     },
+    DependencyInstallation {
+        tool: String,
+        method: String,
+    },
 }
 
 impl JobType {
@@ -47,6 +51,7 @@ impl JobType {
         match self {
             JobType::BitrateAnalysis => "bitrate_analysis",
             JobType::StreamRemoval { .. } => "stream_removal",
+            JobType::DependencyInstallation { .. } => "dependency_installation",
         }
     }
 }

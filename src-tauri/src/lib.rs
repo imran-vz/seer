@@ -9,6 +9,7 @@ pub mod commands;
 pub mod config;
 pub mod database;
 pub mod files;
+pub mod installer;
 pub mod jobs;
 pub mod media;
 pub mod types;
@@ -83,6 +84,10 @@ pub fn run() {
             commands::pick_folder,
             commands::save_last_directory,
             commands::get_default_downloads_dir,
+            // Installer operations
+            commands::get_install_strategies,
+            commands::install_dependency,
+            commands::cancel_installation,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

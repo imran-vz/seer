@@ -329,3 +329,61 @@ pub struct DependenciesResult {
     pub dependencies: Vec<DependencyStatus>,
     pub platform: String,
 }
+
+// ============================================================================
+// Installer Types
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum InstallMethod {
+    /// Homebrew package manager (macOS)
+    Homebrew,
+    /// WinGet package manager (Windows)
+    Winget,
+    /// Chocolatey package manager (Windows, requires admin)
+    Chocolatey,
+    /// Scoop package manager (Windows)
+    Scoop,
+    /// APT package manager (Debian/Ubuntu)
+    Apt,
+    /// DNF package manager (Fedora/RHEL)
+    Dnf,
+    /// Pacman package manager (Arch Linux)
+    Pacman,
+    /// Snap package manager (Linux)
+    Snap,
+    /// Direct download from official sources
+    DirectDownload,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct InstallStrategy {
+    pub method: InstallMethod,
+    pub requires_admin: bool,
+    pub available: bool,
+    pub tool_name: String,
+    pub install_location: String,
+    pub estimated_size_mb: u32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct InstallProgress {
+    pub tool: String,
+    pub method: InstallMethod,
+    pub current: usize,
+    pub total: usize,
+    pub percentage: f64,
+    pub stage: String,
+    pub logs: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct InstallResult {
+    pub success: bool,
+    pub tool: String,
+    pub method: InstallMethod,
+    pub message: String,
+    pub installed_path: Option<String>,
+    pub version: Option<String>,
+}
