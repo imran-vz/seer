@@ -1,0 +1,34 @@
+# Dependencies
+node_modules
+.bun
+
+# Build outputs
+src-tauri/target
+dist
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Documentation
+docs
+*.md
+!CLAUDE.md
