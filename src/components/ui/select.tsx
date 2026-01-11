@@ -20,7 +20,7 @@ interface SelectItemProps {
 	children: React.ReactNode;
 }
 
-interface SelectValueProps {}
+type SelectValueProps = Record<string, never>;
 
 const SelectContext = React.createContext<{
 	value?: string;
@@ -35,7 +35,10 @@ export function Select({ value, onValueChange, children }: SelectProps) {
 	);
 }
 
-export function SelectTrigger({ className = "", children }: SelectTriggerProps) {
+export function SelectTrigger({
+	className = "",
+	children,
+}: SelectTriggerProps) {
 	const [open, setOpen] = React.useState(false);
 
 	return (
@@ -46,6 +49,7 @@ export function SelectTrigger({ className = "", children }: SelectTriggerProps) 
 		>
 			{children}
 			<svg
+				role="img"
 				xmlns="http://www.w3.org/2000/svg"
 				width="24"
 				height="24"
@@ -57,13 +61,14 @@ export function SelectTrigger({ className = "", children }: SelectTriggerProps) 
 				strokeLinejoin="round"
 				className="h-4 w-4 opacity-50"
 			>
+				<title>Toggle options</title>
 				<polyline points="6 9 12 15 18 9" />
 			</svg>
 		</button>
 	);
 }
 
-export function SelectValue({}: SelectValueProps) {
+export function SelectValue(_props: SelectValueProps) {
 	const { value } = React.useContext(SelectContext);
 	return <span>{value || "Select..."}</span>;
 }
@@ -78,11 +83,12 @@ export function SelectItem({ value, children }: SelectItemProps) {
 	const { onValueChange } = React.useContext(SelectContext);
 
 	return (
-		<div
+		<button
+			type="button"
 			onClick={() => onValueChange?.(value)}
-			className="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+			className="relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent hover:text-accent-foreground"
 		>
 			{children}
-		</div>
+		</button>
 	);
 }

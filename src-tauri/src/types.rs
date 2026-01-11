@@ -41,6 +41,104 @@ pub struct FileOperationResult {
 }
 
 // ============================================================================
+// Metadata Types
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum MetadataAction {
+    Set,
+    Delete,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum MetadataScope {
+    Format,
+    Stream,
+    File,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum MetadataOrigin {
+    Ffprobe,
+    Exiftool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataEntry {
+    pub key: String,
+    pub value: String,
+    pub scope: MetadataScope,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_index: Option<i32>,
+    pub origin: MetadataOrigin,
+    pub editable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataOperation {
+    pub action: MetadataAction,
+    pub key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    pub scope: MetadataScope,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_index: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataToolAvailability {
+    pub ffmpeg: bool,
+    pub ffprobe: bool,
+    pub exiftool: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamSummary {
+    pub index: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codec_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codec_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub codec_long_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bit_rate: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataSnapshot {
+    pub path: String,
+    pub file_name: String,
+    pub size: u64,
+    pub modified: Option<String>,
+    pub created: Option<String>,
+    pub extension: Option<String>,
+    pub format_tags: Vec<MetadataEntry>,
+    pub stream_tags: Vec<MetadataEntry>,
+    pub file_tags: Vec<MetadataEntry>,
+    pub stream_summaries: Vec<StreamSummary>,
+    pub tool_availability: MetadataToolAvailability,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MetadataUpdateResult {
+    pub success: bool,
+    pub applied: Vec<MetadataOperation>,
+    pub errors: Vec<String>,
+}
+
+// ============================================================================
 // Bulk Rename Types
 // ============================================================================
 

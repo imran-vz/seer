@@ -12,6 +12,7 @@
 mod bitrate;
 mod files;
 mod installer;
+mod metadata;
 mod media;
 mod settings;
 
@@ -19,5 +20,6 @@ mod settings;
 pub use bitrate::*;
 pub use files::*;
 pub use installer::*;
+pub use metadata::*;
 pub use media::*;
 pub use settings::*;

@@ -12,6 +12,7 @@ pub mod files;
 pub mod installer;
 pub mod jobs;
 pub mod media;
+pub mod metadata;
 pub mod types;
 pub mod window;
 
@@ -65,6 +66,10 @@ pub fn run() {
             commands::create_folders_from_selection,
             commands::apply_filters,
             commands::get_available_extensions,
+            // Metadata operations
+            commands::list_metadata,
+            commands::update_metadata,
+            commands::metadata_tools,
             // Media operations
             commands::get_media_streams,
             commands::remove_streams,

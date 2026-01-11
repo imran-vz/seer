@@ -8,11 +8,11 @@ import {
 	RefreshCw,
 	X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "./ui/scroll-area";
-import { Progress } from "./ui/progress";
 import { useInstallerStore } from "@/stores/installerStore";
+import { Progress } from "./ui/progress";
+import { ScrollArea } from "./ui/scroll-area";
 
 interface DependencyStatus {
 	name: string;
@@ -36,7 +36,7 @@ export function DependencyCheck({ onComplete }: DependencyCheckProps) {
 
 	const installerStore = useInstallerStore();
 
-	const checkDeps = async () => {
+	const checkDeps = useCallback(async () => {
 		setLoading(true);
 		try {
 			const data = await invoke<DependenciesResult>("check_dependencies");
@@ -57,12 +57,11 @@ export function DependencyCheck({ onComplete }: DependencyCheckProps) {
 		} finally {
 			setLoading(false);
 		}
-	};
+	}, [installerStore, onComplete]);
 
 	useEffect(() => {
 		checkDeps();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []); // Only run on mount
+	}, [checkDeps]);
 
 	const handleInstall = async (depName: string) => {
 		// Map ffprobe to ffmpeg (same package)
@@ -174,7 +173,7 @@ export function DependencyCheck({ onComplete }: DependencyCheckProps) {
 										{!dep.installed && !isInstalling && (
 											<div className="flex flex-col gap-2">
 												{/* Method selector */}
-												{hasStrategies && toolState.strategies!.length > 1 && (
+												{hasStrategies && toolState.strategies?.length > 1 && (
 													<select
 														value={toolState.selectedMethod}
 														onChange={(e) =>
@@ -185,8 +184,11 @@ export function DependencyCheck({ onComplete }: DependencyCheckProps) {
 														}
 														className="h-9 w-40 rounded-md border border-input bg-background px-3 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
 													>
-														{toolState.strategies!.map((strategy) => (
-															<option key={strategy.method} value={strategy.method}>
+														{toolState.strategies?.map((strategy) => (
+															<option
+																key={strategy.method}
+																value={strategy.method}
+															>
 																{strategy.method}
 																{strategy.requires_admin && " (sudo)"}
 															</option>

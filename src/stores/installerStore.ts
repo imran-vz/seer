@@ -1,6 +1,6 @@
-import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { create } from "zustand";
 
 export interface InstallStrategy {
 	method: string;
@@ -56,7 +56,10 @@ export const useInstallerStore = create<InstallerStore>((set, get) => ({
 
 	getStrategies: async (tool: string) => {
 		try {
-			const strategies = await invoke<InstallStrategy[]>("get_install_strategies", { tool });
+			const strategies = await invoke<InstallStrategy[]>(
+				"get_install_strategies",
+				{ tool },
+			);
 
 			set((state) => ({
 				tools: {
@@ -112,7 +115,7 @@ export const useInstallerStore = create<InstallerStore>((set, get) => ({
 						},
 					},
 				}));
-			}
+			},
 		);
 
 		// Listen for completion event
@@ -133,7 +136,7 @@ export const useInstallerStore = create<InstallerStore>((set, get) => ({
 				// Clean up listeners
 				progressUnlisten();
 				completeUnlisten();
-			}
+			},
 		);
 
 		try {

@@ -158,7 +158,7 @@ export function FolderCreationDialog({
 				<div className="space-y-4 py-4">
 					{/* Mode Selection */}
 					<div className="space-y-2">
-						<label className="font-medium text-sm">Mode</label>
+						<p className="font-medium text-sm">Mode</p>
 						<div className="space-y-2">
 							<div className="flex items-center space-x-2">
 								<input
@@ -230,7 +230,7 @@ export function FolderCreationDialog({
 											| "codec",
 									)
 								}
-								className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+								className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 							>
 								<option value="extension">Extension</option>
 								<option value="date_modified">Date Modified</option>
@@ -256,7 +256,7 @@ export function FolderCreationDialog({
 												e.target.value as "day" | "month" | "year",
 											)
 										}
-										className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:ring-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+										className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 									>
 										<option value="day">Day (YYYY-MM-DD)</option>
 										<option value="month">Month (YYYY-MM)</option>
