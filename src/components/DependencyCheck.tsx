@@ -115,8 +115,8 @@ export function DependencyCheck({ onComplete }: DependencyCheckProps) {
 							const toolName = dep.name === "ffprobe" ? "ffmpeg" : dep.name;
 							const toolState = installerStore.tools[toolName];
 							const isInstalling = toolState?.status === "installing";
-							const hasStrategies =
-								toolState?.strategies && toolState.strategies.length > 0;
+							const strategies = toolState?.strategies ?? [];
+							const hasStrategies = strategies.length > 0;
 
 							return (
 								<div
@@ -173,7 +173,7 @@ export function DependencyCheck({ onComplete }: DependencyCheckProps) {
 										{!dep.installed && !isInstalling && (
 											<div className="flex flex-col gap-2">
 												{/* Method selector */}
-												{hasStrategies && toolState.strategies?.length > 1 && (
+												{hasStrategies && strategies.length > 1 && (
 													<select
 														value={toolState.selectedMethod}
 														onChange={(e) =>
@@ -184,7 +184,7 @@ export function DependencyCheck({ onComplete }: DependencyCheckProps) {
 														}
 														className="h-9 w-40 rounded-md border border-input bg-background px-3 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
 													>
-														{toolState.strategies?.map((strategy) => (
+														{strategies.map((strategy) => (
 															<option
 																key={strategy.method}
 																value={strategy.method}
