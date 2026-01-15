@@ -99,27 +99,25 @@ fn parse_ffprobe_packets_internal(
             let mut results: Vec<(f64, u64, Option<String>)> = Vec::new();
             if let Some(out) = stdout_handle {
                 let reader = BufReader::with_capacity(64 * 1024, out); // 64KB buffer
-                for line in reader.lines() {
-                    if let Ok(line) = line {
-                        // CSV format: pts_time,dts_time,size,flags
-                        let parts: Vec<&str> = line.split(',').collect();
-                        if parts.len() >= 3 {
-                            // Try pts_time first, fall back to dts_time
-                            let timestamp = parts[0]
-                                .parse::<f64>()
-                                .ok()
-                                .or_else(|| parts[1].parse::<f64>().ok());
-                            let size = parts[2].parse::<u64>().ok();
+                for line in reader.lines().map_while(Result::ok) {
+                    // CSV format: pts_time,dts_time,size,flags
+                    let parts: Vec<&str> = line.split(',').collect();
+                    if parts.len() >= 3 {
+                        // Try pts_time first, fall back to dts_time
+                        let timestamp = parts[0]
+                            .parse::<f64>()
+                            .ok()
+                            .or_else(|| parts[1].parse::<f64>().ok());
+                        let size = parts[2].parse::<u64>().ok();
 
-                            if let (Some(ts), Some(sz)) = (timestamp, size) {
-                                // flags field contains 'K' for keyframes
-                                let frame_type = if parts.len() > 3 && parts[3].contains('K') {
-                                    Some("I".to_string())
-                                } else {
-                                    None
-                                };
-                                results.push((ts, sz, frame_type));
-                            }
+                        if let (Some(ts), Some(sz)) = (timestamp, size) {
+                            // flags field contains 'K' for keyframes
+                            let frame_type = if parts.len() > 3 && parts[3].contains('K') {
+                                Some("I".to_string())
+                            } else {
+                                None
+                            };
+                            results.push((ts, sz, frame_type));
                         }
                     }
                 }

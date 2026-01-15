@@ -6,10 +6,30 @@ use serde::{Deserialize, Serialize};
 // File System Types
 // ============================================================================
 
+pub const IMAGE_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "heic", "heif", "svg",
+];
+
+pub const VIDEO_AUDIO_EXTENSIONS: &[&str] = &[
+    "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "m4v", "mp3", "flac", "wav", "aac", "ogg",
+    "wma", "m4a", "opus",
+];
+
 pub const MEDIA_EXTENSIONS: &[&str] = &[
     "mp4", "mkv", "avi", "mov", "wmv", "flv", "webm", "m4v", "mp3", "flac", "wav", "aac", "ogg",
-    "wma", "m4a", "opus", "jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "heic",
+    "wma", "m4a", "opus", "jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "heic", "heif",
+    "svg",
 ];
+
+/// Check if a file extension is an image type
+pub fn is_image_extension(ext: &str) -> bool {
+    IMAGE_EXTENSIONS.contains(&ext.to_lowercase().as_str())
+}
+
+/// Check if a file extension is a video/audio type
+pub fn is_video_audio_extension(ext: &str) -> bool {
+    VIDEO_AUDIO_EXTENSIONS.contains(&ext.to_lowercase().as_str())
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct FileEntry {

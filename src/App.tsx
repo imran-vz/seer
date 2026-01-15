@@ -14,7 +14,7 @@ import {
 } from "./components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
 import { useAppInitialization } from "./hooks/useAppInitialization";
-import { isVideoOrAudioFile } from "./lib/fileUtils";
+import { isImageFile, isVideoOrAudioFile } from "./lib/fileUtils";
 import { useFileBrowserStore } from "./stores/fileBrowserStore";
 import { useSettingsStore } from "./stores/settingsStore";
 
@@ -63,6 +63,8 @@ function App() {
 	const [activeTab, setActiveTab] = useState("metadata");
 	const selectedPath = useFileBrowserStore((state) => state.selectedPath);
 	const showBitrateTab = isVideoOrAudioFile(selectedPath);
+	const showStreamsTab = isVideoOrAudioFile(selectedPath);
+	const isImage = isImageFile(selectedPath);
 	const rightPanelVisible = useSettingsStore(
 		(state) => state.settings.rightPanelVisible,
 	);
@@ -70,12 +72,12 @@ function App() {
 	// Centralized app initialization
 	const { stage, initialized, error } = useAppInitialization();
 
-	// Switch to metadata tab if user selects an image while on bitrate tab
+	// Switch to metadata tab if user selects an image while on bitrate or streams tab
 	useEffect(() => {
-		if (!showBitrateTab && activeTab === "bitrate") {
+		if (isImage && (activeTab === "bitrate" || activeTab === "streams")) {
 			setActiveTab("metadata");
 		}
-	}, [showBitrateTab, activeTab]);
+	}, [isImage, activeTab]);
 
 	// Show dependency check first
 	if (!depsChecked) {
@@ -120,10 +122,12 @@ function App() {
 									<div className="border-border/50 border-b bg-muted/30 px-2 py-1.5">
 										<TabsList>
 											<TabsTrigger value="metadata">Metadata</TabsTrigger>
-											<TabsTrigger value="streams">Streams</TabsTrigger>
-											<TabsTrigger disabled={!showBitrateTab} value="bitrate">
-												Bitrate
-											</TabsTrigger>
+											{showStreamsTab && (
+												<TabsTrigger value="streams">Streams</TabsTrigger>
+											)}
+											{showBitrateTab && (
+												<TabsTrigger value="bitrate">Bitrate</TabsTrigger>
+											)}
 										</TabsList>
 									</div>
 
@@ -133,12 +137,14 @@ function App() {
 									>
 										<MetadataPanel filePath={selectedPath} />
 									</TabsContent>
-									<TabsContent
-										value="streams"
-										className="flex-1 overflow-hidden"
-									>
-										<StreamsPanel filePath={selectedPath} />
-									</TabsContent>
+									{showStreamsTab && (
+										<TabsContent
+											value="streams"
+											className="flex-1 overflow-hidden"
+										>
+											<StreamsPanel filePath={selectedPath} />
+										</TabsContent>
+									)}
 									{showBitrateTab && (
 										<TabsContent
 											value="bitrate"

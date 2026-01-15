@@ -12,14 +12,14 @@
 mod bitrate;
 mod files;
 mod installer;
-mod metadata;
 mod media;
+mod metadata;
 mod settings;
 
 // Use wildcard re-exports to include macro-generated items from #[tauri::command]
 pub use bitrate::*;
 pub use files::*;
 pub use installer::*;
-pub use metadata::*;
 pub use media::*;
+pub use metadata::*;
 pub use settings::*;

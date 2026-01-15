@@ -242,7 +242,7 @@ fn is_scoop_available() -> bool {
 
 /// Check if APT is available (Debian/Ubuntu Linux)
 fn is_apt_available() -> bool {
-    Path::new("/usr/bin/apt") .exists()
+    Path::new("/usr/bin/apt").exists()
         || Path::new("/usr/bin/apt-get").exists()
         || Path::new("/etc/debian_version").exists()
 }

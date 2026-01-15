@@ -742,7 +742,10 @@ mod tests {
         let date = parse_date("2024-01-15", false);
         assert!(date.is_some());
         let dt = date.unwrap();
-        assert_eq!(dt.format("%Y-%m-%d %H:%M:%S").to_string(), "2024-01-15 00:00:00");
+        assert_eq!(
+            dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+            "2024-01-15 00:00:00"
+        );
     }
 
     #[test]
@@ -750,7 +753,10 @@ mod tests {
         let date = parse_date("2024-01-15", true);
         assert!(date.is_some());
         let dt = date.unwrap();
-        assert_eq!(dt.format("%Y-%m-%d %H:%M:%S").to_string(), "2024-01-15 23:59:59");
+        assert_eq!(
+            dt.format("%Y-%m-%d %H:%M:%S").to_string(),
+            "2024-01-15 23:59:59"
+        );
     }
 
     #[test]
@@ -1084,10 +1090,22 @@ mod tests {
             }),
             file_type: None,
         };
-        let media_info = Some((Some("h264".to_string()), Some("aac".to_string()), Some(1920), Some(1080), Some(120.0)));
+        let media_info = Some((
+            Some("h264".to_string()),
+            Some("aac".to_string()),
+            Some(1920),
+            Some(1080),
+            Some(120.0),
+        ));
         assert!(matches_criteria(&file, &criteria, media_info));
 
-        let wrong_codec_info = Some((Some("hevc".to_string()), Some("aac".to_string()), Some(1920), Some(1080), Some(120.0)));
+        let wrong_codec_info = Some((
+            Some("hevc".to_string()),
+            Some("aac".to_string()),
+            Some(1920),
+            Some(1080),
+            Some(120.0),
+        ));
         assert!(!matches_criteria(&file, &criteria, wrong_codec_info));
     }
 
@@ -1112,10 +1130,22 @@ mod tests {
             }),
             file_type: None,
         };
-        let hd_info = Some((Some("h264".to_string()), Some("aac".to_string()), Some(1920), Some(1080), Some(120.0)));
+        let hd_info = Some((
+            Some("h264".to_string()),
+            Some("aac".to_string()),
+            Some(1920),
+            Some(1080),
+            Some(120.0),
+        ));
         assert!(matches_criteria(&file, &criteria, hd_info));
 
-        let sd_info = Some((Some("h264".to_string()), Some("aac".to_string()), Some(1280), Some(720), Some(120.0)));
+        let sd_info = Some((
+            Some("h264".to_string()),
+            Some("aac".to_string()),
+            Some(1280),
+            Some(720),
+            Some(120.0),
+        ));
         assert!(!matches_criteria(&file, &criteria, sd_info));
     }
 
@@ -1140,13 +1170,31 @@ mod tests {
             }),
             file_type: None,
         };
-        let within_info = Some((Some("h264".to_string()), Some("aac".to_string()), Some(1920), Some(1080), Some(300.0)));
+        let within_info = Some((
+            Some("h264".to_string()),
+            Some("aac".to_string()),
+            Some(1920),
+            Some(1080),
+            Some(300.0),
+        ));
         assert!(matches_criteria(&file, &criteria, within_info));
 
-        let too_short = Some((Some("h264".to_string()), Some("aac".to_string()), Some(1920), Some(1080), Some(30.0)));
+        let too_short = Some((
+            Some("h264".to_string()),
+            Some("aac".to_string()),
+            Some(1920),
+            Some(1080),
+            Some(30.0),
+        ));
         assert!(!matches_criteria(&file, &criteria, too_short));
 
-        let too_long = Some((Some("h264".to_string()), Some("aac".to_string()), Some(1920), Some(1080), Some(900.0)));
+        let too_long = Some((
+            Some("h264".to_string()),
+            Some("aac".to_string()),
+            Some(1920),
+            Some(1080),
+            Some(900.0),
+        ));
         assert!(!matches_criteria(&file, &criteria, too_long));
     }
 }

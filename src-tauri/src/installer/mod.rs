@@ -115,16 +115,19 @@ pub async fn install_tool(
         | InstallMethod::Dnf
         | InstallMethod::Pacman
         | InstallMethod::Snap => {
-            package_managers::install_via_package_manager(
-                tool,
-                &strategy.method,
-                move |p| callback_clone(p),
-            )
+            package_managers::install_via_package_manager(tool, &strategy.method, move |p| {
+                callback_clone(p)
+            })
             .await
         }
         InstallMethod::DirectDownload => {
             let callback_clone2 = callback.clone();
-            downloads::install_via_direct_download(tool, move |p| callback_clone2(p), app_data_dir.clone()).await
+            downloads::install_via_direct_download(
+                tool,
+                move |p| callback_clone2(p),
+                app_data_dir.clone(),
+            )
+            .await
         }
     };
 
@@ -148,7 +151,12 @@ pub async fn install_tool(
             let callback_clone = callback.clone();
             let fallback_result = match fallback_strategy.method {
                 InstallMethod::DirectDownload => {
-                    downloads::install_via_direct_download(tool, move |p| callback_clone(p), app_data_dir.clone()).await
+                    downloads::install_via_direct_download(
+                        tool,
+                        move |p| callback_clone(p),
+                        app_data_dir.clone(),
+                    )
+                    .await
                 }
                 _ => {
                     package_managers::install_via_package_manager(

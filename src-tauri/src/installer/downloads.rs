@@ -14,7 +14,10 @@ pub async fn install_via_direct_download(
     progress_callback: impl Fn(InstallProgress),
     app_data_dir: PathBuf,
 ) -> InstallResult {
-    info!("Starting direct download installation for {}", tool.display_name());
+    info!(
+        "Starting direct download installation for {}",
+        tool.display_name()
+    );
 
     progress_callback(InstallProgress {
         tool: tool.name().to_string(),
@@ -144,7 +147,9 @@ pub async fn install_via_direct_download(
                 success: false,
                 tool: tool.name().to_string(),
                 method: InstallMethod::DirectDownload,
-                message: "Checksum verification failed! Download may be corrupted or tampered with.".to_string(),
+                message:
+                    "Checksum verification failed! Download may be corrupted or tampered with."
+                        .to_string(),
                 installed_path: None,
                 version: None,
             };
@@ -226,7 +231,8 @@ fn get_download_info(tool: &Tool) -> Option<(String, Option<String>)> {
         (Tool::FFmpeg, "linux") => {
             // johnvansickle.com provides static Linux builds
             Some((
-                "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz".to_string(),
+                "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
+                    .to_string(),
                 None,
             ))
         }
@@ -239,10 +245,7 @@ fn get_download_info(tool: &Tool) -> Option<(String, Option<String>)> {
         }
         (Tool::ExifTool, "windows") => {
             // ExifTool Windows executable
-            Some((
-                "https://exiftool.org/exiftool-13.09.zip".to_string(),
-                None,
-            ))
+            Some(("https://exiftool.org/exiftool-13.09.zip".to_string(), None))
         }
         _ => None,
     }
@@ -291,8 +294,7 @@ fn extract_zip(tool: &Tool, data: &[u8], bin_dir: &Path) -> Result<PathBuf, Stri
         let file_name = file.name().to_string();
 
         // Look for the binary executable
-        if file_name.ends_with(&binary_name)
-            || file_name.ends_with(&format!("{}.exe", binary_name))
+        if file_name.ends_with(&binary_name) || file_name.ends_with(&format!("{}.exe", binary_name))
         {
             let target_path = bin_dir.join(&binary_name);
             let mut outfile =
@@ -338,7 +340,10 @@ fn extract_tar(tool: &Tool, data: &[u8], bin_dir: &Path) -> Result<PathBuf, Stri
     let binary_name = get_binary_name(tool);
     let mut installed_path = None;
 
-    for entry in archive.entries().map_err(|e| format!("Failed to read tar: {}", e))? {
+    for entry in archive
+        .entries()
+        .map_err(|e| format!("Failed to read tar: {}", e))?
+    {
         let mut entry = entry.map_err(|e| format!("Failed to read tar entry: {}", e))?;
         let path = entry.path().map_err(|e| format!("Invalid path: {}", e))?;
 

@@ -769,10 +769,7 @@ mod tests {
 
     #[test]
     fn test_preview_find_replace_auto_rename() {
-        let paths = vec![
-            "/path/video.mp4".to_string(),
-            "/path/VIDEO.mp4".to_string(),
-        ];
+        let paths = vec!["/path/video.mp4".to_string(), "/path/VIDEO.mp4".to_string()];
         let pattern = RenamePattern::CaseTransform {
             mode: CaseMode::Lowercase,
         };

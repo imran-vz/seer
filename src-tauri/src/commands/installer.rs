@@ -23,7 +23,10 @@ pub async fn install_dependency(
     tool: String,
     method: Option<String>,
 ) -> Result<InstallResult, String> {
-    info!("install_dependency called: tool={}, method={:?}", tool, method);
+    info!(
+        "install_dependency called: tool={}, method={:?}",
+        tool, method
+    );
 
     let tool_enum = Tool::from_string(&tool)?;
 
@@ -54,9 +57,13 @@ pub async fn install_dependency(
     };
 
     // Perform installation
-    let result =
-        installer::install_tool(&tool_enum, preferred_method, progress_callback, app_data_dir)
-            .await;
+    let result = installer::install_tool(
+        &tool_enum,
+        preferred_method,
+        progress_callback,
+        app_data_dir,
+    )
+    .await;
 
     // Emit completion event
     let _ = app.emit(&format!("install-complete-{}", tool), &result);

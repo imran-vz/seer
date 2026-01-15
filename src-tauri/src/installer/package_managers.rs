@@ -62,11 +62,7 @@ pub async fn install_via_package_manager<F>(
 where
     F: Fn(InstallProgress) + Send + Sync + 'static,
 {
-    info!(
-        "Installing {} via {:?}",
-        tool.display_name(),
-        method
-    );
+    info!("Installing {} via {:?}", tool.display_name(), method);
 
     progress_callback(InstallProgress {
         tool: tool.name().to_string(),
@@ -127,7 +123,13 @@ async fn install_homebrew(
     let cancel_flag = Arc::new(AtomicBool::new(false));
     let cancel_clone = cancel_flag.clone();
     let callback_clone = callback.clone();
-    simulate_progress(tool, &InstallMethod::Homebrew, move |p| callback_clone(p), cancel_clone).await;
+    simulate_progress(
+        tool,
+        &InstallMethod::Homebrew,
+        move |p| callback_clone(p),
+        cancel_clone,
+    )
+    .await;
 
     let result = timeout(
         INSTALL_TIMEOUT,
@@ -162,7 +164,10 @@ async fn install_homebrew(
                     success: true,
                     tool: tool.name().to_string(),
                     method: InstallMethod::Homebrew,
-                    message: format!("{} installed successfully via Homebrew", tool.display_name()),
+                    message: format!(
+                        "{} installed successfully via Homebrew",
+                        tool.display_name()
+                    ),
                     installed_path: Some(format!("/opt/homebrew/bin/{}", package_name)),
                     version: None,
                 }
@@ -215,7 +220,13 @@ async fn install_winget(
         INSTALL_TIMEOUT,
         tokio::task::spawn_blocking(move || {
             Command::new("winget")
-                .args(["install", "--id", package_id, "--silent", "--accept-source-agreements"])
+                .args([
+                    "install",
+                    "--id",
+                    package_id,
+                    "--silent",
+                    "--accept-source-agreements",
+                ])
                 .output()
         }),
     )
@@ -307,7 +318,10 @@ async fn install_apt(
         total: 100,
         percentage: 30.0,
         stage: format!("Running: sudo apt install {}...", package_name),
-        logs: vec![format!("$ sudo apt update && sudo apt install -y {}", package_name)],
+        logs: vec![format!(
+            "$ sudo apt update && sudo apt install -y {}",
+            package_name
+        )],
     });
 
     // Note: This requires sudo and may prompt for password
@@ -431,7 +445,10 @@ async fn install_snap(
 
 /// Handle command execution result
 fn handle_command_result(
-    result: Result<Result<Result<std::process::Output, std::io::Error>, tokio::task::JoinError>, tokio::time::error::Elapsed>,
+    result: Result<
+        Result<Result<std::process::Output, std::io::Error>, tokio::task::JoinError>,
+        tokio::time::error::Elapsed,
+    >,
     tool: &Tool,
     method: &InstallMethod,
     progress_callback: impl Fn(InstallProgress) + Send + Sync + 'static,
@@ -475,7 +492,10 @@ fn handle_command_result(
             }
         }
         _ => {
-            error!("Installation timed out or failed to execute via {:?}", method);
+            error!(
+                "Installation timed out or failed to execute via {:?}",
+                method
+            );
 
             InstallResult {
                 success: false,

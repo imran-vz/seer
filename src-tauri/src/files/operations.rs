@@ -14,8 +14,8 @@ use std::process::Command;
 use crate::config;
 use crate::media::{find_command, get_probe_string};
 use crate::types::{
-    DependenciesResult, DependencyStatus, FileEntry, FileMetadata, FileOperationResult,
-    MEDIA_EXTENSIONS,
+    is_video_audio_extension, DependenciesResult, DependencyStatus, FileEntry, FileMetadata,
+    FileOperationResult, MEDIA_EXTENSIONS,
 };
 
 /// Check if a file is a media file based on extension
@@ -124,8 +124,15 @@ pub fn get_file_metadata(path: String) -> Result<FileMetadata, String> {
     let is_media = is_media_file(file_path);
     debug!("File {:?} is_media={}", validated_path, is_media);
 
-    let ffprobe_data = if is_media {
-        debug!("Getting ffprobe data for media file: {:?}", validated_path);
+    // Only fetch ffprobe data for video/audio files, not images
+    let extension = file_path.extension().and_then(|e| e.to_str()).unwrap_or("");
+    let is_video_audio = is_video_audio_extension(extension);
+
+    let ffprobe_data = if is_media && is_video_audio {
+        debug!(
+            "Getting ffprobe data for video/audio file: {:?}",
+            validated_path
+        );
 
         // Use cached probe data to avoid redundant ffprobe calls
         match get_probe_string(&path) {

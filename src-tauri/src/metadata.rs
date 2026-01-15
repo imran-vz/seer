@@ -8,7 +8,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::config;
 use crate::files;
 use crate::media::{find_command, invalidate_probe_cache};
-use crate::types::{FileMetadata, MetadataAction, MetadataEntry, MetadataOperation, MetadataOrigin, MetadataScope, MetadataSnapshot, MetadataToolAvailability, MetadataUpdateResult, StreamSummary};
+use crate::types::{
+    is_image_extension, is_video_audio_extension, FileMetadata, MetadataAction, MetadataEntry,
+    MetadataOperation, MetadataOrigin, MetadataScope, MetadataSnapshot, MetadataToolAvailability,
+    MetadataUpdateResult, StreamSummary,
+};
 
 fn detect_tools() -> MetadataToolAvailability {
     MetadataToolAvailability {
@@ -58,7 +62,12 @@ fn parse_ffprobe_tags(
             .get("format_long_name")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
-            .or_else(|| format.get("format_name").and_then(|v| v.as_str()).map(|s| s.to_string()));
+            .or_else(|| {
+                format
+                    .get("format_name")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            });
         let duration = format
             .get("duration")
             .and_then(|v| v.as_str())
@@ -80,10 +89,7 @@ fn parse_ffprobe_tags(
 
     if let Some(streams) = parsed.get("streams").and_then(|s| s.as_array()) {
         for stream in streams {
-            let index = stream
-                .get("index")
-                .and_then(|v| v.as_i64())
-                .unwrap_or(-1) as i32;
+            let index = stream.get("index").and_then(|v| v.as_i64()).unwrap_or(-1) as i32;
 
             if let Some(tags) = stream.get("tags").and_then(|t| t.as_object()) {
                 for (key, value) in tags.iter() {
@@ -355,8 +361,7 @@ fn finalize_replacement(original: &Path, new_file: &Path) -> Result<(), String> 
 
     let backup_path = create_backup_path(original);
 
-    fs::rename(original, &backup_path)
-        .map_err(|e| format!("Failed to create backup: {}", e))?;
+    fs::rename(original, &backup_path).map_err(|e| format!("Failed to create backup: {}", e))?;
 
     if let Err(err) = fs::rename(new_file, original) {
         let _ = fs::rename(&backup_path, original);
@@ -375,9 +380,26 @@ pub fn list_metadata(path: String) -> Result<MetadataSnapshot, String> {
 
     let file_metadata: FileMetadata = files::get_file_metadata(path.clone())?;
 
-    let (format_tags, stream_tags, stream_summaries) =
-        parse_ffprobe_tags(file_metadata.ffprobe_data.clone(), &tools);
-    let file_tags = parse_exiftool_tags(&path, &tools);
+    // Determine file type based on extension
+    let extension = file_metadata.extension.as_deref().unwrap_or("");
+    let is_image = is_image_extension(extension);
+    let is_video_audio = is_video_audio_extension(extension);
+
+    // For images: skip ffprobe data (not relevant)
+    // For video/audio: skip exiftool (not relevant)
+    let (format_tags, stream_tags, stream_summaries) = if is_image {
+        // Images don't need ffprobe data
+        (Vec::new(), Vec::new(), Vec::new())
+    } else {
+        parse_ffprobe_tags(file_metadata.ffprobe_data.clone(), &tools)
+    };
+
+    let file_tags = if is_video_audio {
+        // Video/audio files don't need EXIF data
+        Vec::new()
+    } else {
+        parse_exiftool_tags(&path, &tools)
+    };
 
     Ok(MetadataSnapshot {
         path: path.clone(),
@@ -462,10 +484,7 @@ pub fn update_metadata(
 
     Ok(MetadataUpdateResult {
         success: true,
-        applied: ffmpeg_ops
-            .into_iter()
-            .chain(exif_ops.into_iter())
-            .collect(),
+        applied: ffmpeg_ops.into_iter().chain(exif_ops.into_iter()).collect(),
         errors: Vec::new(),
     })
 }
@@ -493,10 +512,19 @@ mod tests {
         let args = {
             let ffmpeg_cmd = find_command("ffmpeg").unwrap_or_else(|| "ffmpeg".to_string());
             let mut cmd = Command::new(&ffmpeg_cmd);
-            cmd.arg("-y").arg("-i").arg(temp_in).arg("-map").arg("0").arg("-c").arg("copy");
+            cmd.arg("-y")
+                .arg("-i")
+                .arg(temp_in)
+                .arg("-map")
+                .arg("0")
+                .arg("-c")
+                .arg("copy");
             let mut format_wipe = false;
             for op in &ops {
-                if op.action == MetadataAction::Delete && op.key == "*" && matches!(op.scope, MetadataScope::Format) {
+                if op.action == MetadataAction::Delete
+                    && op.key == "*"
+                    && matches!(op.scope, MetadataScope::Format)
+                {
                     format_wipe = true;
                 }
             }
@@ -504,8 +532,7 @@ mod tests {
                 cmd.arg("-map_metadata").arg("-1");
             }
             cmd.arg(temp_out);
-            cmd
-                .get_args()
+            cmd.get_args()
                 .map(|a| a.to_string_lossy().to_string())
                 .collect::<Vec<String>>()
         };

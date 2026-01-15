@@ -1,5 +1,7 @@
 use crate::metadata;
-use crate::types::{MetadataOperation, MetadataSnapshot, MetadataToolAvailability, MetadataUpdateResult};
+use crate::types::{
+    MetadataOperation, MetadataSnapshot, MetadataToolAvailability, MetadataUpdateResult,
+};
 
 #[tauri::command]
 pub fn list_metadata(path: String) -> Result<MetadataSnapshot, String> {
