@@ -159,6 +159,8 @@ export function AddTagDialog({ disabled, filename, onAdd }: AddTagDialogProps) {
 							{showSuggestions && filteredTags.length > 0 && (
 								<div className="absolute top-full left-0 z-50 mt-1 max-h-48 w-full overflow-y-auto rounded-lg border border-input bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10">
 									{filteredTags.map((tag) => (
+										// biome-ignore lint/a11y/noStaticElementInteractions: for datalist
+										// biome-ignore lint/a11y/useKeyWithClickEvents: for datalist
 										<div
 											key={tag}
 											className="relative flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-xs/relaxed outline-none hover:bg-accent hover:text-accent-foreground"
