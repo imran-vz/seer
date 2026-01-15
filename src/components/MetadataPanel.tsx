@@ -226,7 +226,11 @@ export function MetadataPanel({ filePath }: MetadataPanelProps) {
 						<h3 className="font-medium text-muted-foreground text-sm uppercase tracking-wider">
 							Metadata
 						</h3>
-						<AddTagDialog disabled={!toolsReady} onAdd={handleStageSet} />
+						<AddTagDialog
+							disabled={!toolsReady}
+							filename={filePath?.split(/[/\\]/).pop()}
+							onAdd={handleStageSet}
+						/>
 					</div>
 
 					{/* Format Container - only for video/audio files */}

@@ -237,9 +237,6 @@ pub fn rename_file(path: String, new_name: String) -> Result<FileOperationResult
     let new_path = parent.join(&new_name);
     debug!("Rename destination: {:?}", new_path);
 
-    // Validate destination path is also within allowed directories
-    config::validate_path(&new_path)?;
-
     if new_path.exists() {
         warn!("Rename failed: destination already exists: {:?}", new_path);
         return Err(format!("A file named '{}' already exists", new_name));
@@ -340,9 +337,6 @@ pub fn move_file(path: String, destination: String) -> Result<FileOperationResul
     let file_name = validated_src.file_name().ok_or("Cannot get file name")?;
     let new_path = validated_dest.join(file_name);
     debug!("Move destination path: {:?}", new_path);
-
-    // Validate final destination path
-    config::validate_path(&new_path)?;
 
     if new_path.exists() {
         warn!(
@@ -467,8 +461,6 @@ pub fn create_folder(path: String, name: String) -> Result<FileOperationResult, 
     let new_folder = validated_parent.join(&name);
     debug!("Creating folder at: {:?}", new_folder);
 
-    // Validate new folder path is also within allowed directories
-    config::validate_path(&new_folder)?;
     if new_folder.exists() {
         warn!(
             "Create folder failed: folder already exists: {:?}",
