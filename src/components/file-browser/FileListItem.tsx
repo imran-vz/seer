@@ -82,9 +82,9 @@ export function FileListItem({
 					</span>
 					<span className="text-muted-foreground/70">
 						{file.is_dir ? (
-							<Folder className="size-4 text-blue-500/80" />
+							<Folder className="size-4" />
 						) : file.is_media ? (
-							<Film className="size-4 text-purple-500/80" />
+							<Film className="size-4" />
 						) : (
 							<FileText className="size-4" />
 						)}

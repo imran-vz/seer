@@ -1,28 +1,46 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
-
-@custom-variant dark (&:is(.dark *));
 
 @font-face {
 	font-family: "Google Sans Code";
 	src: url("/fonts/Google_Sans_Code/GoogleSansCode-VariableFont_wght.ttf")
 		format("truetype");
-	font-weight: 100 900;
+	font-weight: 400 700;
 	font-style: normal;
-	font-display: swap;
 }
 
 @font-face {
 	font-family: "Google Sans Code";
 	src: url("/fonts/Google_Sans_Code/GoogleSansCode-Italic-VariableFont_wght.ttf")
 		format("truetype");
-	font-weight: 100 900;
+	font-weight: 400 700;
 	font-style: italic;
-	font-display: swap;
 }
 
+@custom-variant dark (&:is(.dark *));
+
 @theme inline {
-	--font-sans: "Google Sans Code", ui-sans-serif, system-ui, sans-serif;
+	/* Factory.ai Design Language Colors */
+	--color-factory-black: #050505;
+	--color-factory-panel: #0a0a0a;
+	--color-factory-border: #1f1f1f;
+	--color-factory-orange: #ff5c00;
+	--color-factory-text-main: #ededed;
+	--color-factory-text-muted: #858585;
+	--color-factory-text-code: #a3a3a3;
+
+	/* Typography */
+	--font-sans: "Inter", "system-ui", "sans-serif";
+	--font-mono: "Google Sans Code", "JetBrains Mono", "Fira Code", "monospace";
+
+	/* Background Patterns */
+	--background-image-grid-pattern:
+		linear-gradient(to right, #1f1f1f 1px, transparent 1px),
+		linear-gradient(to bottom, #1f1f1f 1px, transparent 1px);
+	--background-size-grid-sm: 20px 20px;
+
+	/* Semantic mappings */
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
 	--radius-lg: var(--radius);
@@ -30,6 +48,7 @@
 	--radius-2xl: calc(var(--radius) + 8px);
 	--radius-3xl: calc(var(--radius) + 12px);
 	--radius-4xl: calc(var(--radius) + 16px);
+
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
@@ -64,72 +83,59 @@
 }
 
 :root {
-	--radius: 0.625rem;
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.145 0 0);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.205 0 0);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.97 0 0);
-	--secondary-foreground: oklch(0.205 0 0);
-	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(0.556 0 0);
-	--accent: oklch(0.97 0 0);
-	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: oklch(0.922 0 0);
-	--input: oklch(0.922 0 0);
-	--ring: oklch(0.708 0 0);
-	--chart-1: oklch(0.646 0.222 41.116);
-	--chart-2: oklch(0.6 0.118 184.704);
-	--chart-3: oklch(0.398 0.07 227.392);
-	--chart-4: oklch(0.828 0.189 84.429);
-	--chart-5: oklch(0.769 0.188 70.08);
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(0.205 0 0);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.708 0 0);
-}
+	/* Base Design Tokens */
+	--radius: 0.25rem; /* slight roundedness */
 
-.dark {
-	--background: oklch(0.145 0 0);
-	--foreground: oklch(0.985 0 0);
-	--card: oklch(0.205 0 0);
-	--card-foreground: oklch(0.985 0 0);
-	--popover: oklch(0.205 0 0);
-	--popover-foreground: oklch(0.985 0 0);
-	--primary: oklch(0.922 0 0);
-	--primary-foreground: oklch(0.205 0 0);
-	--secondary: oklch(0.269 0 0);
-	--secondary-foreground: oklch(0.985 0 0);
-	--muted: oklch(0.269 0 0);
-	--muted-foreground: oklch(0.708 0 0);
-	--accent: oklch(0.269 0 0);
-	--accent-foreground: oklch(0.985 0 0);
-	--destructive: oklch(0.704 0.191 22.216);
-	--border: oklch(1 0 0 / 10%);
-	--input: oklch(1 0 0 / 15%);
-	--ring: oklch(0.556 0 0);
-	--chart-1: oklch(0.488 0.243 264.376);
-	--chart-2: oklch(0.696 0.17 162.48);
-	--chart-3: oklch(0.769 0.188 70.08);
-	--chart-4: oklch(0.627 0.265 303.9);
-	--chart-5: oklch(0.645 0.246 16.439);
-	--sidebar: oklch(0.205 0 0);
-	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.488 0.243 264.376);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.269 0 0);
-	--sidebar-accent-foreground: oklch(0.985 0 0);
-	--sidebar-border: oklch(1 0 0 / 10%);
-	--sidebar-ring: oklch(0.556 0 0);
+	/* Base colors */
+	--background: #050505; /* factory-black */
+	--foreground: #ededed; /* factory-text-main */
+
+	/* Cards & Panels */
+	--card: #0a0a0a; /* factory-panel */
+	--card-foreground: #ededed;
+
+	--popover: #0a0a0a; /* factory-panel */
+	--popover-foreground: #ededed;
+
+	/* Primary: Orange Accent */
+	--primary: #ff5c00; /* factory-orange */
+	--primary-foreground: #ededed;
+
+	/* Secondary: Subtle Dark */
+	--secondary: #1f1f1f; /* factory-border */
+	--secondary-foreground: #ededed;
+
+	/* Muted */
+	--muted: #0a0a0a; /* factory-panel */
+	--muted-foreground: #858585; /* factory-text-muted */
+
+	/* Accent: Hover states */
+	--accent: #1f1f1f; /* factory-border */
+	--accent-foreground: #ededed;
+
+	--destructive: #7f1d1d;
+
+	/* Borders & Inputs */
+	--border: #1f1f1f; /* factory-border */
+	--input: #1f1f1f;
+	--ring: #ff5c00; /* factory-orange */
+
+	/* Factory Charts */
+	--chart-1: #ff5c00; /* factory-orange */
+	--chart-2: #ededed;
+	--chart-3: #858585;
+	--chart-4: #1f1f1f;
+	--chart-5: #0a0a0a;
+
+	/* Sidebar */
+	--sidebar: #050505; /* factory-black */
+	--sidebar-foreground: #ededed;
+	--sidebar-primary: #ff5c00;
+	--sidebar-primary-foreground: #ededed;
+	--sidebar-accent: #1f1f1f;
+	--sidebar-accent-foreground: #ededed;
+	--sidebar-border: #1f1f1f;
+	--sidebar-ring: #ff5c00;
 }
 
 @layer base {
@@ -145,9 +151,30 @@
 		background: transparent;
 	}
 	body {
-		@apply text-foreground;
+		@apply bg-factory-black text-factory-text-main font-sans antialiased;
 		background: transparent;
 	}
+
+	/* Apply mono style to specific UI elements automatically */
+	h1,
+	h2,
+	h3,
+	.ui-label {
+		@apply tracking-tight;
+	}
+
+	/* Factory Aesthetic: Mono for UI components */
+	button,
+	input,
+	select,
+	textarea,
+	label,
+	nav,
+	[role="button"],
+	.ui-mono {
+		@apply font-mono;
+	}
+
 	.no-transitions,
 	.no-transitions * {
 		/* biome-ignore lint/complexity/noImportantStyles: need to tauri */
