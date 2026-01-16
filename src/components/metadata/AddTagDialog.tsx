@@ -57,7 +57,7 @@ const inferTitle = (filename: string) => {
 	const yearMatch = base.match(yearPattern);
 
 	if (yearMatch?.index && yearMatch.index > 0) {
-		const year = Number.parseInt(yearMatch[0].replace(/[[(\])]/g, ""));
+		const year = Number.parseInt(yearMatch[0].replace(/[[(\])]/g, ""), 10);
 		if (year > 1900 && year < 2100) {
 			return base.substring(0, yearMatch.index + yearMatch[0].length).trim();
 		}
