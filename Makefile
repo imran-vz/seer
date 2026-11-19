@@ -2,7 +2,7 @@
 
 help:
 	@echo "Usage:"
-	@echo "  make version VERSION=x.y.z  - Update version in package.json and Cargo.toml"
+	@echo "  make version VERSION=x.y.z  - Update the workspace version in Cargo.toml"
 	@echo "  make tag VERSION=x.y.z      - Update version, commit, tag, and push"
 	@echo "  make run                    - Run the GPUI app (debug)"
 	@echo "  make test                   - Run the Rust tests"
@@ -23,9 +23,8 @@ version:
 		exit 1; \
 	fi
 	@echo "Updating version to $(VERSION)..."
-	@sed -i.bak 's/"version": ".*"/"version": "$(VERSION)"/' package.json && rm package.json.bak
-	@sed -i.bak 's/^version = ".*"/version = "$(VERSION)"/' src-tauri/Cargo.toml && rm src-tauri/Cargo.toml.bak
-	@sed -i.bak '4s/"version": ".*"/"version": "$(VERSION)"/' src-tauri/tauri.conf.json && rm src-tauri/tauri.conf.json.bak
+	@sed -i.bak 's/^version = ".*"/version = "$(VERSION)"/' Cargo.toml && rm Cargo.toml.bak
+	@cargo update --workspace --offline >/dev/null 2>&1 || cargo update --workspace
 	@echo "Version updated to $(VERSION)"
 
 tag: version
@@ -34,7 +33,7 @@ tag: version
 		exit 1; \
 	fi
 	@echo "Checking for changes..."
-	@git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json src-tauri/Cargo.lock
+	@git add Cargo.toml Cargo.lock
 	@if git diff --cached --quiet; then \
 		echo "No version changes detected - version already $(VERSION)"; \
 	else \

@@ -4,9 +4,9 @@ docs/.vitepress/cache
 # Dependencies
 node_modules
 
-# Tauri/Rust (not needed for docs deployment)
-src-tauri
+# Rust (not needed for docs deployment)
 target
+crates
 
 # Development files
 .DS_Store

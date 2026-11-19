@@ -1,53 +1,36 @@
 # Installation
 
+Seer is a native Mac app. It needs macOS 13 or later.
+
 ## Prerequisites
 
-Before installing Seer, ensure you have the following dependencies installed:
+Seer links the FFmpeg libraries, so FFmpeg must be installed:
 
-### Required
+```bash
+brew install ffmpeg
+```
 
-- **FFmpeg** — Required for media analysis and processing
-  - macOS: `brew install ffmpeg`
-  - Windows: Download from [ffmpeg.org](https://ffmpeg.org/download.html)
-  - Linux: `apt install ffmpeg` or `yum install ffmpeg`
+## Download
 
-### Optional
-
-- **ExifTool** — For enhanced image metadata support
-  - macOS: `brew install exiftool`
-  - Windows: Download from [exiftool.org](https://exiftool.org/)
-  - Linux: `apt install libimage-exiftool-perl`
-
-## Download Binaries
-
-### macOS
-
-Pre-built binaries are available for macOS:
+Pre-built builds for Apple Silicon are on
 
 👉 **[GitHub Releases](https://github.com/imran-vz/seer/releases)**
 
 **Installation steps:**
-1. Download the `.dmg` file
-2. Open the `.dmg` and drag Seer to Applications
-3. For unsigned apps, run in Terminal:
+1. Download the `.zip` file and open it
+2. Drag Seer to Applications
+3. The app is not code-signed, so clear the quarantine flag in Terminal:
    ```bash
    xattr -cr /Applications/Seer.app
    ```
 4. First launch: Right-click → Open (to bypass Gatekeeper)
 
-### Windows & Linux
-
-Pre-built binaries for Windows and Linux are not currently available. Please [build from source](#build-from-source).
-
 ## Build from Source
-
-**Required for Windows and Linux users.** macOS users can also build from source if preferred.
 
 ### Prerequisites for Building
 
-- [Bun](https://bun.sh/) or Node.js 18+
-- [Rust](https://rustup.rs/) 1.70+
-- FFmpeg (see [Prerequisites](#prerequisites) above)
+- [Rust](https://rustup.rs/)
+- FFmpeg libraries and pkg-config: `brew install ffmpeg pkgconf`
 
 ### Build Steps
 
@@ -56,40 +39,23 @@ Pre-built binaries for Windows and Linux are not currently available. Please [bu
 git clone https://github.com/imran-vz/seer.git
 cd seer
 
-# Install frontend dependencies
-bun install
-
-# Build the application
-bun run tauri build
+# Build target/release/Seer.app
+make app
 ```
-
-The built application will be in `src-tauri/target/release/`.
 
 ### Development Mode
 
-To run in development mode with hot reload:
-
 ```bash
-bun run tauri dev
+make run                         # or: cargo run -p seer -- <folder>
 ```
-
-## Verify Installation
-
-After installation, verify that FFmpeg is accessible:
-
-1. Open Seer
-2. The app will check for FFmpeg on startup
-3. If FFmpeg is missing, you'll see a warning with installation instructions
 
 ## Troubleshooting
 
-### FFmpeg Not Found
+### Seer quits on launch
 
-If Seer can't find FFmpeg:
-
-- Ensure FFmpeg is in your system PATH
-- Restart Seer after installing FFmpeg
-- On macOS: Restart terminal after `brew install ffmpeg`
+Seer loads the FFmpeg libraries it was built against. If FFmpeg is missing
+or was upgraded to a new major version, reinstall it with
+`brew install ffmpeg`, or rebuild Seer from source.
 
 ### macOS Gatekeeper Warning
 
@@ -101,8 +67,8 @@ xattr -cr /Applications/Seer.app
 ```
 Then launch normally.
 
-**Option 2: System Preferences**
-1. Go to System Preferences → Security & Privacy
+**Option 2: System Settings**
+1. Go to System Settings → Privacy & Security
 2. Click "Open Anyway" for Seer
 
 **Option 3: Right-click**

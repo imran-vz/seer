@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Seer"
   text: "சீர்"
-  tagline: Media file manager with bulk operations, codec detection, and stream management
+  tagline: Media file manager for the Mac, with codec detection and stream management
   image:
     src: /seer.svg
     alt: Seer
@@ -22,38 +22,34 @@ hero:
 features:
   - icon: 🎬
     title: Media Analysis
-    details: View detailed codec information and stream analysis for video, audio, subtitles, and attachments. Powered by FFmpeg/FFprobe.
+    details: Codec, duration and stream details for video, audio, subtitles and attachments. FFmpeg is linked into the app, so nothing shells out.
 
   - icon: 📊
-    title: Bitrate Analysis
-    details: Interactive bitrate graphs with per-stream visualization, statistics, peak detection, and smart sampling for large files. Export as PNG, JSON, or CSV.
-
-  - icon: ⚡
-    title: Smart Caching
-    details: SQLite-based persistent caching with hash-based validation. Automatic cache invalidation when files change.
-
-  - icon: 🔍
-    title: Smart Filtering
-    details: Filter files by size, date, extension, file type, and media properties (resolution, codec, duration). Apply multiple filters simultaneously.
+    title: Bit Rate Analysis
+    details: Per-stream bit rate chart and statistics, cached so a file is only analysed again when it changes.
 
   - icon: 🎯
-    title: Stream Management
-    details: Inspect and remove streams with bulk cleanup across multiple files. Preset filters for subtitles, non-English audio, commentary, and cover art.
+    title: Lossless Stream Removal
+    details: Drop unwanted audio, subtitle and other streams without re-encoding. Seer suggests duplicates and says why; the original goes to the Trash.
 
-  - icon: 📁
-    title: Bulk File Operations
-    details: Advanced file browser with bulk renaming (4 patterns), folder creation (3 modes), smart filtering, and complete file management suite.
+  - icon: 🧹
+    title: Stream Name Clean-up
+    details: Review every video under a folder for stream titles that carry a web address or say nothing about their stream, and fix them in one go.
 
-  - icon: 🌍
-    title: Cross-Platform
-    details: Native experience on macOS, Windows, and Linux. Built with Tauri for performance and small bundle size.
+  - icon: 🏷️
+    title: Name Suggestions
+    details: Clean "Title (Year)" and "Show S01E02" names worked out offline, with optional suggestions from an AI model using your own API key.
+
+  - icon: 🍎
+    title: Native Mac App
+    details: Written in Rust with GPUI. Finder's keyboard and selection rules, a menu bar command for everything, light and dark appearance.
 ---
 
 ## What is Seer?
 
 **Seer** (Tamil: சீர்) — to prune, order, uniformity, neatness.
 
-A desktop application for media file management with powerful bulk operations: rename files with templates, create folder structures, clean up media streams, and filter files intelligently. Built for codec analysis and stream management.
+A native Mac app for media file management: inspect codecs and streams, analyse bit rate, strip unwanted streams without re-encoding, and give files clean names.
 
 ## Screenshots
 
@@ -64,17 +60,13 @@ A desktop application for media file management with powerful bulk operations: r
 
 ## Tech Stack
 
-Built with modern technologies for performance and reliability:
-
-- **Frontend**: React + Vite + TypeScript
-- **Backend**: Tauri (Rust)
-- **Database**: SQLite (via tauri-plugin-sql)
-- **State Management**: Zustand
-- **Media Processing**: FFmpeg / FFprobe
-- **Code Quality**: Biome (formatting & linting)
+- **App**: Rust + [GPUI](https://www.gpui.rs), with AppKit through `objc2`
+- **Media processing**: FFmpeg libraries, linked in-process
+- **Cache**: SQLite
 
 ## Coming Soon
 
+- **Bulk Rename, Filters and Folders from Selection**
 - **Duplicate Finder** — Find and remove duplicate files by hash
 - **Metadata Editing** — Edit EXIF, ID3, and Matroska tags in bulk
 - **Re-encoding** — FFmpeg-based transcoding with presets and hardware acceleration

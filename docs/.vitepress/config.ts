@@ -16,7 +16,7 @@ export default defineConfig({
 			{
 				name: "keywords",
 				content:
-					"media file manager, metadata editor, audio codec detection, video re-encoding, bitrate analysis, file organization, batch processing, ffmpeg, ffprobe, sqlite caching, desktop app, open source, free software, macOS, Windows, Linux, tauri, rust",
+					"media file manager, metadata editor, audio codec detection, video re-encoding, bitrate analysis, file organization, batch processing, ffmpeg, ffprobe, sqlite caching, desktop app, open source, free software, macOS, rust, gpui",
 			},
 		],
 		["meta", { property: "og:type", content: "website" }],

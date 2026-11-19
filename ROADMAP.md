@@ -8,24 +8,22 @@ This document outlines the planned features and development milestones for Seer.
 
 ### v0.1.0 - Foundation ✅
 
-- 🟢 Project setup (Tauri + Vite + TypeScript)
+- 🟢 Native Mac app in Rust and GPUI, with FFmpeg linked in-process
 - 🟢 File browser with directory navigation
-- 🟢 Basic metadata display using ffprobe
+- 🟢 Basic metadata display
 - 🟢 Theme switching (system/light/dark)
-- 🟢 Custom title bar with window controls
-- 🟢 Dependency checking and onboarding flow
-- 🟢 Cross-platform path detection for tools
+- 🟢 Restored window state
 
 ### v0.2.0 - Advanced File Management ✅
 
-- 🟢 Advanced file browser with context menus
-- 🟢 Bulk file selection and actions
-- 🟢 File operations (rename, move, copy, delete)
+- 🟢 Finder-style keyboard navigation and selection
+- 🟢 File operations (rename, Move to Trash)
 - 🟢 New folder creation
-- 🟢 Reveal in Finder/Explorer
-- 🟢 Clipboard integration
-- 🟢 State management with Zustand
-- 🟢 Biome config for formatting/linting
+- 🟢 Reveal in Finder
+- 🟢 Live reload when a folder changes
+- ⚪ Bulk rename
+- ⚪ Filters and search
+- ⚪ Folders from selection
 
 ### v0.3.0 - Media Analysis ✅
 
@@ -33,17 +31,19 @@ This document outlines the planned features and development milestones for Seer.
 - 🟢 Stream analysis (video, audio, subtitles, attachments)
 - 🟢 Stream metadata viewing (language, title, flags)
 - 🟢 Bitrate graphs and statistics
-- 🟢 SQLite database for caching and job tracking
-- 🟢 Export bitrate charts as PNG (theme-aware)
-- 🟢 Export bitrate data as JSON/CSV
-- 🟢 File metadata caching with hash-based validation
+- 🟢 SQLite cache for analysis results
+- ⚪ Export bitrate charts and data
+- 🟢 Analysis caching keyed by file fingerprint
 - 🟢 Automatic cache invalidation on file changes
 - ⚪ Media file comparison tool
 - ⚪ Duplicate detection
 
 ### v0.4.0 - Pruning & Stream Management
 
-- 🟢 Stream removal (unwanted audio/subtitle tracks)
+- 🟢 Lossless stream removal (unwanted audio/subtitle tracks)
+- 🟢 Suggestions for duplicate streams
+- 🟢 Folder-wide stream name clean-up
+- 🟢 Clean file name suggestions (offline, or with an AI model)
 - ⚪ Lossless container conversion (remuxing)
 - ⚪ File size optimization suggestions
 - ⚪ Bulk stream operations with filters
@@ -51,7 +51,7 @@ This document outlines the planned features and development milestones for Seer.
 ### v0.5.0 - Metadata Editing
 
 - ⚪ EXIF metadata viewing (images)
-- ⚪ EXIF metadata editing via ExifTool
+- ⚪ EXIF metadata editing
 - ⚪ ID3 tag support for audio files
 - ⚪ Matroska/MKV tag editing
 - ⚪ Batch metadata operations
@@ -77,22 +77,15 @@ This document outlines the planned features and development milestones for Seer.
 
 ### Caching Architecture
 
-The caching system uses SQLite with automatic invalidation:
+Analysis results are cached in SQLite (`crates/seer-core/src/cache.rs`):
 
-1. **File Hash Computation** (Rust backend)
-   - SHA-256 hash of: file size + mtime + first 8KB + last 8KB
-   - Fast computation even for large files
+1. **Fingerprint** (`crates/seer-core/src/fingerprint.rs`)
+   - xxh3 hash of the file's size, modification time and first and last 8 KB
+   - Fast even for large files
 
-2. **Cache Validation** (TypeScript frontend)
-   - Cache key format: `{cache_type}:{file_path}`
-   - On cache lookup, current file hash is compared with stored hash
-   - Mismatched hashes trigger automatic cache invalidation
-
-3. **Cache Types**
-   - `file_metadata` - File info + ffprobe data
-   - `bitrate_analysis` - Computed bitrate statistics
-   - `media_streams` - Parsed stream information
-   - `ffprobe_data` - Raw ffprobe output
+2. **Validation**
+   - Rows are keyed by path and fingerprint; a file that changes gets a new fingerprint, so stale results are never read
+   - A schema version is stored with each row; bumping it when a cached type changes shape makes old rows ignored
 
 ## Future Considerations
 
@@ -105,20 +98,15 @@ The caching system uses SQLite with automatic invalidation:
 
 ## Dependencies
 
-### Required External Tools
-
-| Tool | Purpose | Installation |
+| Dependency | Purpose | Installation |
 |------|---------|--------------|
-| FFmpeg/FFprobe | Media analysis & encoding | [ffmpeg.org](https://ffmpeg.org) |
-| ExifTool | Image metadata | [exiftool.org](https://exiftool.org) |
+| FFmpeg libraries | Media analysis and remuxing, linked in-process | `brew install ffmpeg pkgconf` |
 
 ### Platform Support
 
 | Platform | Status |
 |----------|--------|
-| macOS | 🟢 Primary development platform |
-| Windows | 🟡 Supported, testing in progress |
-| Linux | 🟡 Supported, testing in progress |
+| macOS 13+ | 🟢 Supported |
 
 ## Contributing
 

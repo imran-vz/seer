@@ -4,221 +4,96 @@
 
 ### File Management
 
-**Advanced File Browser**
-- Navigate directories with full keyboard and mouse support
-- Bulk file selection (Shift/Cmd+Click)
-- Context menu operations
-- File operations: rename, move, copy, delete
-- Create new folders
-- Reveal files in system explorer (Finder/Explorer)
-- Sort and filter files
+**File Browser**
+- Finder's keyboard and selection rules (arrow keys, Shift to extend, ⌘A, Esc)
+- Back and forward history, enclosing folder, and Go menu locations
+- Sidebar with common locations
+- Sort by name, size or date modified
+- Show or hide hidden files
+- Live reload when a folder changes on disk
+- Codec and duration columns for media files, probed in the background
 
-**Smart File Filtering**
-- Filter by file type (All, Files Only, Folders Only, Media Only)
-- Size range filters with presets (>100MB, >1GB, <10MB, 100MB-1GB)
-- Date range filtering (modified date)
-- Extension-based filtering with dynamic available extensions
-- Advanced media filters: resolution presets (4K+, 1080p+, 720p+)
-- Video/audio codec filtering (H264, HEVC, AV1, VP9, AAC, AC3, DTS, FLAC, etc.)
-- Duration range filtering for media files
-- Active filter badges with quick removal
-- Filtered results count display
-
-**Bulk Renaming**
-- Find & Replace with case sensitivity
-- Sequential numbering with padding - supports `{n}`, `{name}`, `{ext}` placeholders
-- Case transformation (lowercase, uppercase, titlecase)
-- Template system with 9 variables:
-  - `{name}` - Original filename (no extension)
-  - `{ext}` - File extension
-  - `{date}` - Current date (YYYY-MM-DD)
-  - `{index}` - File index (0-based)
-  - `{counter}` - File counter (1-based)
-  - `{parent}` - Parent folder name
-  - `{type}` - File type (video/audio/file)
-  - `{video_codec}` - Video codec (media files only)
-  - `{audio_codec}` - Audio codec (media files only)
-- Live preview with conflict detection
-- Auto-rename conflicts option (file.mp4 → file (1).mp4)
-- Validation errors display
-
-**Folder Creation from Selection**
-- Per-file mode: Create individual folder for each file
-- Grouped mode with 5 criteria:
-  - By Extension: Groups files by file extension
-  - By Date Modified: Groups by date (Day/Month/Year granularity)
-  - By Media Type: Groups by video/audio/other
-  - By Resolution: Groups by resolution (4K, 1080p, 720p, etc.)
-  - By Codec: Groups by video codec
-- Single folder mode: Move all files into one custom-named folder
-- Automatic folder creation and file organization
+**File Operations**
+- Rename
+- New folder
+- Reveal in Finder
+- Move to Trash
 
 ### Media Analysis
 
-**Codec Detection**
-- Detailed codec information for all streams
-- Video: codec, resolution, frame rate, bit depth, color space
-- Audio: codec, channels, sample rate, bit depth
-- Subtitle: format, language metadata
-- Attachment: embedded fonts and files
+**Inspector**
+- **Info**: container, size, duration and file details
+- **Streams**: every video, audio, subtitle and attachment stream with its codec, language, title and flags
+- **Bit Rate**: per-stream bit rate chart and statistics
 
-**Stream Inspection**
-- Per-stream metadata display
-- Language and title information
-- Stream flags (default, forced, hearing impaired)
-- Duration and bitrate per stream
-
-**FFprobe Integration**
-- Complete media file analysis
-- Format and container information
-- Metadata extraction
-- Chapter and attachment detection
-
-### Bitrate Analysis
-
-**Interactive Bitrate Charts**
-- Real-time bitrate visualization
-- Per-stream bitrate graphs
-- Zoom and pan controls
-- Peak detection and statistics
-- Packet-level or frame-level analysis modes
-- Smart sampling for large files (>1GB)
-
-**Export Options**
-- Export charts as PNG (theme-aware)
-- Export data as JSON
-- Export data as CSV
-- Include metadata in exports
-
-**Statistics**
-- Average, min, max bitrate
-- Peak bitrate timestamps
-- Bitrate distribution
-- File size breakdown by stream
+All media reading goes through the FFmpeg libraries linked into the app.
+Nothing shells out to `ffmpeg` or `ffprobe`.
 
 ### Stream Management
 
-**Stream Operations**
-- View all streams in a file
-- Inspect stream metadata
-- Remove unwanted streams
-- Lossless stream removal (copy codec)
-- Background job processing with progress tracking
+**Lossless Stream Removal**
+- Click the streams you want to remove, then press Remove
+- The file is rewritten without re-encoding
+- The original moves to the Trash, so nothing is lost
+- Runs in the background
 
-**Bulk Stream Cleanup**
-- Custom stream selection across multiple files
-- Expandable file list with per-stream checkboxes
-- Preset filters: "All Subtitles", "Non-English Audio", "Commentary", "Cover Art"
-- Stream info display with codec, language, and flags
-- Job queue integration with progress tracking
-- Stream type icons and detailed labels
+**Suggestions**
+- Seer proposes streams that duplicate a better one: every video but the best, and for each audio language every track but the best
+- Each suggestion says why it was made; it only marks streams, and you still review and press Remove
+- Cover art, subtitles and attachments are never suggested
 
-**Use Cases**
-- Remove commentary audio tracks
-- Strip subtitle streams
-- Remove embedded fonts
-- Clean up unnecessary streams
-- Batch cleanup of multiple files
+**Stream Name Clean-up**
+- Reviews every video under a folder, at any depth
+- Flags stream titles that carry a web address or don't describe their stream
+- Offers a standard name ("1080p H.264", "AC-3 5.1 384 kbps", "English") and fixes them in one go
 
-### Caching System
+### Naming
 
-**SQLite-Based Caching**
-- Persistent database for all cache data
-- Background job tracking
-- Analysis result caching
-- File metadata caching
+**Name Suggestions**
+- Works out a clean name from a release file name, offline: `Title (Year).ext` or `Show S01E02.ext`, the way Jellyfin and Plex expect
+- Optional suggestions from an AI model (Anthropic, OpenAI or OpenRouter) with your own API key
+- The key is kept in the macOS Keychain; only the file name and a few facts read from the file are sent, never the media
 
-**Hash-Based Validation**
-- SHA-256 hash computation
-- Based on: file size + mtime + first/last 8KB
-- Automatic cache invalidation on file changes
-- No stale data issues
+### Caching
 
-**Cache Types**
-- File metadata cache
-- Bitrate analysis cache
-- FFprobe data cache
-- Job status cache
+- Analysis results are stored in SQLite
+- Each result is keyed by a fingerprint of the file's size, modification time and first and last 8 KB
+- A file that changes is analysed again; stale results are never shown
 
 ### User Experience
 
-**Theme Support**
-- System theme detection
-- Light mode
-- Dark mode
-- Theme persistence
+- Light and dark appearance, following the system
+- Window size, panes and layout restored on launch
+- Every command is in the menu bar
 
-**Background Jobs**
-- Concurrent job processing
-- Job queue management
-- Progress tracking
-- Cancel individual or all jobs
-- Job history
+## Not Ported Yet
 
-**Cross-Platform**
-- Native experience on macOS, Windows, Linux
-- Platform-specific optimizations
-- System file manager integration
-- Native file dialogs
+These were in the earlier version of Seer and are coming back:
+
+- Bulk rename with templates
+- Filters and search
+- Folders from selection
+- Tag editing
+- Bit rate export (PNG, JSON, CSV)
 
 ## Coming Soon 🚧
 
 ### Metadata Editing
-
-**Tag Editing**
 - EXIF metadata (images)
 - ID3 tags (audio)
-- Matroska tags (video)
-- MP4 metadata
-- Batch metadata editing
-
-**Cover Art**
-- Embed cover art
-- Extract cover art
-- Replace cover art
-- Auto-fetch from online sources
+- Matroska and MP4 tags
+- Cover art
 
 ### Re-encoding
+- Video and audio codec conversion
+- Presets and custom parameters
+- Apple VideoToolbox hardware acceleration
 
-**FFmpeg Transcoding**
-- Video codec conversion
-- Audio codec conversion
-- Preset management
-- Custom FFmpeg arguments
-
-**Hardware Acceleration**
-- NVIDIA NVENC
-- Intel Quick Sync
-- AMD VCE
-- Apple VideoToolbox
-
-**Quality Control**
-- CRF/QP settings
-- Bitrate targeting
-- Two-pass encoding
-- Quality comparison tools
-
-### Advanced Batch Processing
-
-**Job Queue Enhancements**
-- Priority management
-- Estimated time remaining
-
-**Additional Batch Operations**
-- Bulk re-encoding
-- Bulk metadata editing
-
-### Advanced File Organization
-
-**Smart Organization**
+### File Organization
 - Duplicate detection and removal
-- Watch folders for automatic processing
-- Advanced file sorting rules
-
-**Advanced Templates**
-- Regex-based renaming patterns
-- Custom metadata-based organization
+- Watch folders
+- Naming templates and organisation rules
 
 ## Roadmap
 
-See the full [roadmap on GitHub](https://github.com/imran-vz/seer/blob/main/ROADMAP.md) for detailed development plans and timelines.
+See the full [roadmap on GitHub](https://github.com/imran-vz/seer/blob/main/ROADMAP.md) for detailed development plans.

@@ -2,233 +2,105 @@
 
 ## Quick Start Workflow
 
-1. **Open a Directory** — Select a folder containing media files
-2. **Analyze Files** — Click on any media file to view details
-3. **View Bitrate Charts** — Switch to Bitrate tab for visual analysis
-4. **Manage Streams** — Remove unwanted audio/subtitle tracks
-5. **Export Data** — Save charts or data for external use
+1. **Open a folder** — Pick a location in the sidebar, or Go → Go to Folder… (⇧⌘G)
+2. **Select a media file** — The inspector shows its details
+3. **Analyse bit rate** — Open the Bit Rate tab, or press ⌘B
+4. **Remove streams** — Mark unwanted tracks in the Streams tab and press Remove
+5. **Clean up names** — Accept a suggested file name, or clean up stream names across a folder (⇧⌘K)
 
-## Opening Files
+## Browsing
 
-### Select Initial Directory
+- Use the arrow keys to move, Shift+arrow to extend the selection
+- ⌘O or ⌘↓ opens the selection; ⌘↑ goes to the enclosing folder
+- ⌘[ and ⌘] go back and forward
+- Sort from the View menu; ⇧⌘. shows hidden files
+- The list reloads by itself when the folder changes on disk
 
-On first launch, Seer will prompt you to select a directory to browse. This directory will be remembered for future sessions.
+## Analysing Media Files
 
-### Change Directory
+Select a file and the inspector shows three tabs:
 
-- Use the folder icon in the toolbar
-- Navigate using the path breadcrumb
-- Use keyboard shortcut `Cmd+O` (macOS) or `Ctrl+O` (Windows/Linux)
+- **Info**: container, size, duration
+- **Streams**: each video, audio, subtitle and attachment stream, with codec, language, title and flags
+- **Bit Rate**: a per-stream bit rate chart with statistics
 
-### File Browser
+Bit rate results are cached. A file is analysed again only when it changes.
 
-- Click on any file to view details
-- Use arrow keys to navigate
-- Press `Space` to preview
-- Right-click for context menu
+## Removing Streams
 
-## Analyzing Media Files
+1. Select a media file and open the Streams tab
+2. Click the streams you want to remove, or start from Seer's suggestions
+3. Press Remove
 
-### View File Metadata
+The file is rewritten without re-encoding and the original moves to the Trash.
 
-1. Select a media file
-2. File info panel shows:
-   - File size and duration
-   - Container format
-   - All streams (video, audio, subtitles)
-   - Codec information
+## Cleaning Up Stream Names
 
-### Codec Details
+File → Clean Up Stream Names… (⇧⌘K) reviews every video under the current
+folder for stream titles that carry a web address or don't describe their
+stream, and offers a standard name for each. Apply them in one go.
 
-For each stream, view:
-- **Video**: Resolution, frame rate, codec, bit depth, color space
-- **Audio**: Channels, sample rate, codec, bit depth
-- **Subtitles**: Format, language, title
+## Name Suggestions
 
-## Bitrate Analysis
-
-### Generate Bitrate Chart
-
-1. Select a media file
-2. Click "Analyze Bitrate" or switch to Bitrate tab
-3. Wait for analysis to complete (cached for future use)
-4. Interactive chart displays bitrate over time
-
-### Understanding the Chart
-
-- **Y-axis**: Bitrate in Mbps
-- **X-axis**: Time in seconds
-- **Multiple lines**: One per stream (video, audio, etc.)
-- **Hover**: View exact values at any point
-- **Zoom**: Scroll to zoom, drag to pan
-
-### Export Bitrate Data
-
-**Export as PNG**
-- Preserves current theme
-- High resolution
-- Suitable for reports
-
-**Export as JSON**
-- Full data points
-- Includes metadata
-- Programmatic access
-
-**Export as CSV**
-- Spreadsheet compatible
-- Easy data analysis
-- One row per time point
-
-## Stream Management
-
-### View All Streams
-
-1. Select a media file
-2. Streams panel shows all tracks
-3. Each stream displays:
-   - Type (video/audio/subtitle)
-   - Codec and language
-   - Bitrate and duration
-
-### Remove Streams
-
-1. Select streams to remove (checkbox)
-2. Click "Remove Selected Streams"
-3. Job runs in background
-4. Original file is backed up
-5. Progress tracked in Jobs panel
-
-**Note**: Stream removal is lossless (copy codec). No re-encoding occurs.
-
-## File Operations
-
-### Context Menu
-
-Right-click any file for quick actions:
-- **Rename**: Change filename
-- **Move**: Move to another folder
-- **Copy**: Duplicate file
-- **Delete**: Move to trash
-- **Reveal**: Open in Finder/Explorer
-
-### Bulk Operations
-
-1. Select multiple files:
-   - Click + Shift for range
-   - Click + Cmd/Ctrl for individual
-2. Right-click selection
-3. Choose operation
-4. Confirm action
-
-### Create Folders
-
-- Click "New Folder" button
-- Or right-click → New Folder
-- Enter folder name
-- Folder created in current directory
-
-## Settings & Preferences
-
-### Theme
-
-- **System**: Follow OS theme
-- **Light**: Always light mode
-- **Dark**: Always dark mode
-
-### Initial Directory
-
-- Set default startup directory
-- Use "Set as Default" in folder picker
-- Change anytime in settings
-
-### Cache Management
-
-- View cache size
-- Clear specific cache types
-- Clear all cached data
-- Cache location: App data directory
+For a video file, the inspector suggests a clean name such as
+`Title (Year).mkv` or `Show S01E02.mkv`, worked out offline from the file name.
+You can also ask an AI model (Anthropic, OpenAI or OpenRouter) using your own
+API key, which is stored in the Keychain. Only text is sent, never the media.
 
 ## Keyboard Shortcuts
 
 ### Navigation
-- `↑/↓`: Navigate files
-- `Enter`: Open/select file
-- `Backspace`: Go up one directory
-- `Cmd/Ctrl + O`: Open directory
+| Shortcut | Action |
+|---|---|
+| ↑ / ↓ | Move selection |
+| ⇧↑ / ⇧↓ | Extend selection |
+| ⌥↑ / ⌥↓, Home / End | First / last item |
+| ⌘O, ⌘↓ | Open |
+| ⌘↑ | Enclosing folder |
+| ⌘[ / ⌘] | Back / forward |
+| ⇧⌘G | Go to folder |
+| ⇧⌘H, ⇧⌘D, ⇧⌘O, ⌥⌘L | Home, Desktop, Documents, Downloads |
 
-### File Operations
-- `Cmd/Ctrl + R`: Rename selected file
-- `Cmd/Ctrl + D`: Delete selected file
-- `Cmd/Ctrl + N`: New folder
+### Files
+| Shortcut | Action |
+|---|---|
+| Return | Rename |
+| ⇧⌘N | New folder |
+| ⌘R | Reveal in Finder |
+| ⌘⌫ | Move to Trash |
+| ⌘A / Esc | Select all / deselect all |
 
-### Panels
-- `Cmd/Ctrl + 1`: File browser
-- `Cmd/Ctrl + 2`: Metadata panel
-- `Cmd/Ctrl + 3`: Bitrate panel
-- `Cmd/Ctrl + J`: Jobs panel
+### Media
+| Shortcut | Action |
+|---|---|
+| ⌘B | Analyse bit rate |
+| ⇧⌘K | Clean up stream names |
 
-### General
-- `Cmd/Ctrl + ,`: Open settings
-- `Cmd/Ctrl + Q`: Quit (macOS)
-- `Alt + F4`: Quit (Windows/Linux)
+### View
+| Shortcut | Action |
+|---|---|
+| ⌥⌘S | Toggle sidebar |
+| ⌥⌘I | Toggle inspector |
+| ⇧⌘. | Toggle hidden files |
 
 ## Troubleshooting
 
-### FFmpeg Not Found
+### Seer quits on launch
 
-**Symptom**: "FFmpeg not found" warning on startup
+FFmpeg is missing or was upgraded to a new major version. Run
+`brew install ffmpeg`, or rebuild Seer from source. See [Installation](/installation).
 
-**Solution**:
-1. Install FFmpeg (see [Installation](/installation))
-2. Ensure FFmpeg is in system PATH
-3. Restart Seer
+### Bit rate analysis fails
 
-### Bitrate Analysis Fails
-
-**Symptom**: Bitrate analysis errors or hangs
-
-**Possible causes**:
-- Corrupted media file
-- Unsupported codec
-- FFmpeg version too old
-
-**Solution**:
-1. Verify file plays in other media players
-2. Update FFmpeg to latest version
-3. Check Jobs panel for detailed error
-
-### Cache Issues
-
-**Symptom**: Stale data showing for changed files
-
-**Solution**:
-1. Cache should auto-invalidate when files change
-2. Manually clear cache: Settings → Clear Cache
-3. Report issue if problem persists
-
-### Performance Issues
-
-**Symptom**: Slow analysis or UI lag
-
-**Possible causes**:
-- Very large media files (>50GB)
-- Many files in directory (>10,000)
-- Low available RAM
-
-**Solution**:
-1. For large files: Seer uses smart sampling
-2. For many files: Use subfolders to organize
-3. Close other applications to free RAM
-4. Clear cache to free disk space
+- Check that the file plays in another player; it may be damaged
+- Update FFmpeg with `brew upgrade ffmpeg` and rebuild Seer
 
 ## Getting Help
 
-- **Documentation**: You're reading it!
 - **GitHub Issues**: [Report bugs](https://github.com/imran-vz/seer/issues)
 - **Discussions**: [Ask questions](https://github.com/imran-vz/seer/discussions)
 
 ## Next Steps
 
 - Explore [Features](/features) for detailed capabilities
-- Check [Roadmap](https://github.com/imran-vz/seer/blob/main/ROADMAP.md) for upcoming features
-- Star the project on [GitHub](https://github.com/imran-vz/seer) if you find it useful!
+- Check the [Roadmap](https://github.com/imran-vz/seer/blob/main/ROADMAP.md) for upcoming features

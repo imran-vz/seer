@@ -3,7 +3,7 @@ node_modules
 .bun
 
 # Build outputs
-src-tauri/target
+target
 dist
 
 # Git
