@@ -1,0 +1,21 @@
+[workspace]
+resolver = "3"
+members = ["crates/seer-core", "crates/seer"]
+exclude = ["src-tauri"]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2024"
+license = "MIT"
+
+[profile.dev.package]
+gpui-pre = { opt-level = 3 }
+gpui-pre-platform = { opt-level = 3 }
+gpui-component = { opt-level = 3 }
+taffy = { opt-level = 3 }
+seer-core = { opt-level = 2 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

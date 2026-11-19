@@ -34,3 +34,7 @@ actions-runner/
 !docs/*md
 !README.md
 !ROADMAP.md
+!DESIGN.md
+
+# Rust workspace
+/target

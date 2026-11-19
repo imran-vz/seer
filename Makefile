@@ -1,9 +1,21 @@
-.PHONY: version tag help
+.PHONY: version tag help run test app
 
 help:
 	@echo "Usage:"
 	@echo "  make version VERSION=x.y.z  - Update version in package.json and Cargo.toml"
 	@echo "  make tag VERSION=x.y.z      - Update version, commit, tag, and push"
+	@echo "  make run                    - Run the GPUI app (debug)"
+	@echo "  make test                   - Run the Rust tests"
+	@echo "  make app                    - Build target/release/Seer.app"
+
+run:
+	cargo run -p seer
+
+test:
+	cargo test --workspace
+
+app:
+	scripts/bundle.sh
 
 version:
 	@if [ -z "$(VERSION)" ]; then \

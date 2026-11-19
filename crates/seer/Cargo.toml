@@ -1,0 +1,28 @@
+[package]
+name = "seer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+seer-core = { path = "../seer-core" }
+gpui-kit = "=0.10.0"
+anyhow = "1"
+log = "0.4"
+dirs = "6"
+image = { version = "0.25", default-features = false }
+smallvec = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+smol = "2"
+notify = "8"
+ureq = { version = "3", features = ["json"] }
+security-framework = "3"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-foundation = "0.3"
+objc2-app-kit = "0.3"
+objc2-core-graphics = "0.3"
+objc2-core-foundation = "0.3"
+block2 = "0.6"

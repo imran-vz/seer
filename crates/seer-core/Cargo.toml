@@ -1,0 +1,19 @@
+[package]
+name = "seer-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+log = "0.4"
+trash = "5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ffmpeg-the-third = "6"
+rusqlite = { version = "0.43", features = ["bundled"] }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+[dev-dependencies]
+tempfile = "3"

@@ -4,6 +4,33 @@ A desktop application for media file management, metadata editing, codec detecti
 
 **Seer** (Tamil: சீர்) — to prune, order, uniformity, neatness.
 
+## Rewrite in progress (branch `gpui-rewrite`)
+
+Seer is being rewritten as a native Mac app: Rust and [GPUI](https://www.gpui.rs)
+instead of Tauri and React, with FFmpeg linked in-process instead of spawning
+`ffprobe`. The rules it is built to are in [DESIGN.md](DESIGN.md).
+
+```bash
+brew install ffmpeg pkgconf   # FFmpeg libraries and pkg-config, needed to build
+make run                      # run the app; `cargo run -p seer -- <folder>` opens a folder
+make test                     # core tests (probe, bitrate, stream removal, cache)
+make app                      # build target/release/Seer.app
+```
+
+| Crate | What it is |
+|---|---|
+| `crates/seer-core` | The engine, with no UI: listing, probing, bitrate analysis, lossless stream removal, cache. |
+| `crates/seer` | The GPUI app: sidebar, file list, inspector. |
+
+Working in the new app: browsing with Finder's keyboard and selection rules,
+codec and duration columns, the Info, Streams and Bit Rate inspector tabs,
+lossless stream removal (the original goes to the Trash), rename, new folder,
+Move to Trash, live reload when a folder changes, and restored window state.
+
+Not ported yet: bulk rename, filters and search, folders from selection, bulk
+stream cleanup, tag editing, bit rate export, settings. Until they are, the
+Tauri app below stays in the tree (`src/`, `src-tauri/`).
+
 ## Features
 
 ### ✅ Available Now
