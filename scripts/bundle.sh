@@ -17,9 +17,13 @@ rm -rf "$APP" "$ICONSET"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$ICONSET"
 cp target/release/seer "$APP/Contents/MacOS/seer"
 
+# Both drawings come from scripts/icon.py: the 9-row letter for 16 and 32pt,
+# where the 12-row one blurs, and the 12-row letter from 128pt up.
 for size in 16 32 128 256 512; do
-    sips -z "$size" "$size" app-icon.png --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
-    sips -z $((size * 2)) $((size * 2)) app-icon.png --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
+    source=app-icon.png
+    [ "$size" -le 32 ] && source=app-icon-small.png
+    sips -z "$size" "$size" "$source" --out "$ICONSET/icon_${size}x${size}.png" >/dev/null
+    sips -z $((size * 2)) $((size * 2)) "$source" --out "$ICONSET/icon_${size}x${size}@2x.png" >/dev/null
 done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/Seer.icns"
 rm -rf "$ICONSET"

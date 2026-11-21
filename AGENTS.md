@@ -6,8 +6,11 @@ macOS is implemented; other platforms exist as data in `platform.rs`.
 
 It is a Cargo workspace: `seer-core` is the engine (no UI, synchronous,
 unit-tested) and `seer` is the GPUI app. Each module's `//!` header says what
-it owns. `docs/` is a VitePress site and the only JavaScript in the repo
-(`bun install`, `bun run docs:dev`).
+it owns. `site/` is the website: one page, `site/src/index.html`, which
+`python3 site/build.py` turns into a self-contained `site/dist/index.html`
+(images embedded). The `seer-site` Cloudflare Worker serves it at
+seer.imran.codes (`site/wrangler.jsonc`); Workers Builds deploys it from
+`main` when `site/` changes.
 
 ## Commands
 
@@ -17,6 +20,7 @@ cargo run -p seer -- <folder>             # run, optionally opening a folder
 cargo test --workspace
 cargo clippy --workspace --all-targets && cargo fmt --all
 scripts/bundle.sh                         # target/release/Seer.app
+python3 scripts/icon.py                   # app icon PNGs and the site's logo SVGs
 ```
 
 `SEER_APPEARANCE=light|dark` forces the appearance. In debug builds,
@@ -42,4 +46,4 @@ on the Mac.
 
 Read the relevant section of `DESIGN.md`: Principles, Metrics, Components,
 Behaviour, Platforms, or "Tells we refuse". When a user-visible feature
-changes, update `README.md` and `docs/features.md` too.
+changes, update `README.md` and `site/src/index.html` too.

@@ -64,7 +64,7 @@ cargo fmt --all
 |---|---|
 | `crates/seer-core` | The engine, with no UI: listing, probing, bit rate analysis, lossless stream removal, naming, cache. Synchronous and unit-tested. |
 | `crates/seer` | The GPUI app: sidebar, file list, inspector, background jobs. |
-| `docs/` | The documentation website (VitePress). |
+| `site/` | The website: one self-contained page, built by `python3 site/build.py`. |
 | `scripts/bundle.sh` | Builds `target/release/Seer.app`. |
 
 ## Roadmap

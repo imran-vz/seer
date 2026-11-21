@@ -12,9 +12,8 @@ dist
 dist-ssr
 *.local
 
-# VitePress
-docs/.vitepress/cache
-docs/.vitepress/dist
+# Website build output
+site/dist
 
 # Editor directories and files
 .vscode/*
@@ -31,7 +30,6 @@ actions-runner/
 .vercel
 
 *.md
-!docs/*md
 !README.md
 !ROADMAP.md
 !DESIGN.md
@@ -40,3 +38,6 @@ actions-runner/
 
 # Rust workspace
 /target
+
+# Wrangler state
+.wrangler/

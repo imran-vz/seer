@@ -1,0 +1,13 @@
+// The website as a Cloudflare Worker that only serves static assets.
+// `python3 build.py` writes dist/index.html; `npx wrangler deploy` uploads it.
+{
+  "name": "seer-site",
+  "compatibility_date": "2026-06-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "routes": [{ "pattern": "seer.imran.codes", "custom_domain": true }],
+  "workers_dev": true,
+  "observability": { "enabled": false }
+}
