@@ -14,6 +14,11 @@ serde_json = "1"
 ffmpeg-the-third = "6"
 rusqlite = { version = "0.43", features = ["bundled"] }
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
+mtp-rs = "0.38"
+futures = "0.3"
+bytes = "1"
+libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
+mtp-rs = { version = "0.38", features = ["virtual-device"] }

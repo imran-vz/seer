@@ -21,6 +21,27 @@ pub fn size(bytes: u64) -> String {
     }
 }
 
+/// A count and its noun: "1 item", "4 items". The plural adds an "s".
+pub fn count(n: usize, noun: &str) -> String {
+    match n {
+        1 => format!("1 {noun}"),
+        n => format!("{n} {noun}s"),
+    }
+}
+
+/// A fraction from 0 to 1 as a whole percentage: "44%". Never shows 100%
+/// before the work is complete.
+pub fn percent(fraction: f32) -> String {
+    let fraction = fraction.clamp(0., 1.);
+    let whole = (fraction * 100.).round() as u32;
+    let whole = if whole == 100 && fraction < 1. {
+        99
+    } else {
+        whole
+    };
+    format!("{whole}%")
+}
+
 /// Bit rate in bits per second.
 pub fn bitrate(bps: u64) -> String {
     let b = bps as f64;
@@ -131,6 +152,39 @@ pub fn codec(name: &str) -> String {
     known.to_owned()
 }
 
+/// Display name for a container, from FFmpeg's demuxer name and its
+/// description: "FLAC", not "raw FLAC"; "Matroska / WebM", not
+/// "matroska,webm". Falls back to the description without FFmpeg's
+/// "raw " prefix and parenthetical.
+pub fn container(name: &str, description: &str) -> String {
+    let known = match name {
+        "flac" => "FLAC",
+        "mp3" => "MP3",
+        "aac" => "AAC",
+        "ac3" => "AC-3",
+        "eac3" => "E-AC-3",
+        "wav" => "WAV",
+        "avi" => "AVI",
+        "ogg" => "Ogg",
+        "matroska,webm" => "Matroska / WebM",
+        "mpegts" => "MPEG-TS",
+        "asf" => "ASF",
+        "flv" => "FLV",
+        _ => {
+            let text = description.strip_prefix("raw ").unwrap_or(description);
+            let text = match text.find(" (") {
+                Some(at) => &text[..at],
+                None => text,
+            };
+            return match text.trim() {
+                "" => name.split(',').next().unwrap_or(name).to_uppercase(),
+                text => text.to_owned(),
+            };
+        }
+    };
+    known.to_owned()
+}
+
 /// English name for an ISO 639 language code, or the code itself.
 pub fn language(code: &str) -> String {
     let name = match code.to_ascii_lowercase().as_str() {
@@ -184,10 +238,42 @@ pub fn channels(count: u32) -> String {
     }
 }
 
+/// How big a video stream's picture is, in the fewest words: its class
+/// ("1080p", "4K"), or its pixel size below the classes ("176×144").
+pub fn video_size(width: Option<u32>, height: Option<u32>) -> Option<String> {
+    let (w, h) = (width?, height?);
+    Some(match resolution_class(w, h) {
+        Some(class) => class.to_owned(),
+        None => format!("{w}×{h}"),
+    })
+}
+
+/// A video stream as Seer names it everywhere (the list, Clean Up's
+/// proposed names, the inspector): its size, then its codec. "1080p H.264".
+pub fn video_name(codec: &str, width: Option<u32>, height: Option<u32>) -> String {
+    let codec = self::codec(codec);
+    match video_size(width, height) {
+        Some(size) => format!("{size} {codec}"),
+        None => codec,
+    }
+}
+
+/// An audio stream as Seer names it everywhere: its channel layout, then
+/// its codec, in the order a video leads with its size. "Mono AAC", "5.1
+/// E-AC-3".
+pub fn audio_name(codec: &str, channels: Option<u32>) -> String {
+    let codec = self::codec(codec);
+    match channels {
+        Some(count) => format!("{} {codec}", self::channels(count)),
+        None => codec,
+    }
+}
+
 pub fn resolution(width: u32, height: u32) -> String {
     format!("{width} × {height}")
 }
 
+/// "1080p", "4K" and the like, down to 240p. `None` below that.
 pub fn resolution_class(width: u32, height: u32) -> Option<&'static str> {
     // Width decides for wide (cropped) content, height for the rest.
     Some(match (width, height) {
@@ -198,6 +284,8 @@ pub fn resolution_class(width: u32, height: u32) -> Option<&'static str> {
         (w, h) if w >= 1260 || h >= 700 => "720p",
         (_, h) if h >= 560 => "576p",
         (_, h) if h >= 470 => "480p",
+        (_, h) if h >= 340 => "360p",
+        (_, h) if h >= 220 => "240p",
         _ => return None,
     })
 }
@@ -214,6 +302,17 @@ mod tests {
         assert_eq!(size(12_400), "12 KB");
         assert_eq!(size(4_210_000), "4.2 MB");
         assert_eq!(size(1_370_000_000), "1.37 GB");
+    }
+
+    #[test]
+    fn counts_and_percentages() {
+        assert_eq!(count(1, "item"), "1 item");
+        assert_eq!(count(0, "file"), "0 files");
+        assert_eq!(count(4, "item"), "4 items");
+        assert_eq!(percent(0.44), "44%");
+        assert_eq!(percent(0.996), "99%");
+        assert_eq!(percent(1.), "100%");
+        assert_eq!(percent(-1.), "0%");
     }
 
     #[test]
@@ -251,10 +350,42 @@ mod tests {
     }
 
     #[test]
+    fn containers() {
+        assert_eq!(container("flac", "raw FLAC"), "FLAC");
+        assert_eq!(
+            container("matroska,webm", "Matroska / WebM"),
+            "Matroska / WebM"
+        );
+        assert_eq!(
+            container("mov,mp4,m4a,3gp,3g2,mj2", "QuickTime / MOV"),
+            "QuickTime / MOV"
+        );
+        assert_eq!(container("dts", "raw DTS"), "DTS");
+        assert_eq!(container("wv", "WavPack (lossless audio)"), "WavPack");
+        assert_eq!(container("xyz", ""), "XYZ");
+    }
+
+    #[test]
     fn resolution_classes() {
         assert_eq!(resolution_class(3840, 1600), Some("4K"));
         assert_eq!(resolution_class(1920, 800), Some("1080p"));
         assert_eq!(resolution_class(1280, 720), Some("720p"));
-        assert_eq!(resolution_class(320, 240), None);
+        assert_eq!(resolution_class(640, 360), Some("360p"));
+        assert_eq!(resolution_class(320, 240), Some("240p"));
+        assert_eq!(resolution_class(176, 144), None);
+    }
+
+    /// One order for media names everywhere: what the stream is like
+    /// (size, layout) first, then the codec (decision 65).
+    #[test]
+    fn media_names_lead_with_size_and_layout() {
+        assert_eq!(video_size(Some(1920), Some(1080)).as_deref(), Some("1080p"));
+        assert_eq!(video_size(Some(176), Some(144)).as_deref(), Some("176×144"));
+        assert_eq!(video_size(None, Some(1080)), None);
+        assert_eq!(video_name("h264", Some(1920), Some(1080)), "1080p H.264");
+        assert_eq!(video_name("mpeg2video", None, None), "MPEG-2");
+        assert_eq!(audio_name("aac", Some(1)), "Mono AAC");
+        assert_eq!(audio_name("eac3", Some(6)), "5.1 E-AC-3");
+        assert_eq!(audio_name("opus", None), "Opus");
     }
 }

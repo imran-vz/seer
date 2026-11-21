@@ -2,7 +2,7 @@
 //!
 //! Release sites stamp their address into the title of every stream. A
 //! title is fine when it is empty or only describes the stream it sits on
-//! ("1080p H.264", "AC-3 5.1 384 kbps", "English"). Anything else is flagged,
+//! ("1080p H.264", "5.1 AC-3 384 kbps", "English"). Anything else is flagged,
 //! with a standard name offered in its place.
 
 use crate::format;
@@ -105,9 +105,12 @@ pub fn standard_name(stream: &Stream) -> Option<String> {
             parts.extend(stream.dynamic_range().map(str::to_owned));
             Some(parts.join(" "))
         }
+        // Layout first, then the codec, as the file list's Audio column
+        // reads ("Mono AAC"), the way video leads with its size.
         StreamKind::Audio => {
-            let mut parts = vec![codec];
-            parts.extend(stream.channels.map(format::channels));
+            let mut parts: Vec<String> =
+                stream.channels.map(format::channels).into_iter().collect();
+            parts.push(codec);
             parts.extend(stream.bit_rate.map(format::bitrate));
             Some(parts.join(" "))
         }
@@ -305,26 +308,61 @@ fn word_fits(word: &str, stream: &Stream) -> bool {
     false
 }
 
-/// Every video file under `root`, at any depth, in a stable order. Hidden
-/// items and symbolic links to folders are skipped.
-pub fn video_files(root: &Path, cancel: &AtomicBool) -> Vec<PathBuf> {
-    let mut found = Vec::new();
+/// What [`video_files`] found under a folder: every video, and every place
+/// it could not look into, so a result never passes off an incomplete walk
+/// as a complete one.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct Videos {
+    /// Every video file, in a stable order.
+    pub files: Vec<PathBuf>,
+    /// Folders that could not be listed, or not to the end, and items whose
+    /// kind could not be read. Videos in them were not found.
+    pub unread: Vec<Unread>,
+}
+
+/// A place [`video_files`] could not look into.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unread {
+    pub path: PathBuf,
+    /// A folder that could not be listed (or not completely); otherwise an
+    /// item whose kind could not be read.
+    pub folder: bool,
+}
+
+/// Every video file under `root`, at any depth, in a stable order, and
+/// everything that could not be read on the way. Hidden items and symbolic
+/// links to folders are skipped on purpose and are not counted as unread.
+pub fn video_files(root: &Path, cancel: &AtomicBool) -> Videos {
+    let mut found = Videos::default();
     let mut pending = vec![root.to_owned()];
     while let Some(dir) = pending.pop() {
         if cancel.load(Ordering::Relaxed) {
             break;
         }
         let Ok(entries) = std::fs::read_dir(&dir) else {
+            found.unread.push(Unread {
+                path: dir,
+                folder: true,
+            });
             continue;
         };
-        for entry in entries.flatten() {
+        let mut incomplete = false;
+        for entry in entries {
+            let Ok(entry) = entry else {
+                incomplete = true;
+                continue;
+            };
             if entry.file_name().to_string_lossy().starts_with('.') {
                 continue;
             }
+            let path = entry.path();
             let Ok(kind) = entry.file_type() else {
+                found.unread.push(Unread {
+                    path,
+                    folder: false,
+                });
                 continue;
             };
-            let path = entry.path();
             if kind.is_dir() {
                 pending.push(path);
             } else if kind.is_file()
@@ -334,11 +372,21 @@ pub fn video_files(root: &Path, cancel: &AtomicBool) -> Vec<PathBuf> {
                     .map(Kind::from_extension)
                     == Some(Kind::Video)
             {
-                found.push(path);
+                found.files.push(path);
             }
         }
+        if incomplete {
+            found.unread.push(Unread {
+                path: dir,
+                folder: true,
+            });
+        }
     }
-    found.sort_by(|a, b| crate::fs::natural_cmp(&a.to_string_lossy(), &b.to_string_lossy()));
+    let order = |a: &PathBuf, b: &PathBuf| {
+        crate::fs::natural_cmp(&a.to_string_lossy(), &b.to_string_lossy())
+    };
+    found.files.sort_by(order);
+    found.unread.sort_by(|a, b| order(&a.path, &b.path));
     found
 }
 
@@ -423,7 +471,7 @@ mod tests {
         assert_eq!(issues[0].standard, None);
         assert_eq!(issues[1].reason, Reason::WebAddress);
         assert_eq!(issues[1].standard.as_deref(), Some("1080p H.264"));
-        assert_eq!(issues[2].standard.as_deref(), Some("AC-3 5.1 384 kbps"));
+        assert_eq!(issues[2].standard.as_deref(), Some("5.1 AC-3 384 kbps"));
     }
 
     #[test]
@@ -436,6 +484,7 @@ mod tests {
         }
         for title in [
             "AC-3 5.1 384 kbps",
+            "5.1 AC-3 384 kbps",
             "DD5.1 - 384Kbps",
             "Tamil",
             "Tamil DD 5.1",
@@ -487,7 +536,10 @@ mod tests {
         ] {
             std::fs::write(dir.path().join(file), []).unwrap();
         }
-        let found: Vec<_> = video_files(dir.path(), &AtomicBool::new(false))
+        let videos = video_files(dir.path(), &AtomicBool::new(false));
+        assert!(videos.unread.is_empty());
+        let found: Vec<_> = videos
+            .files
             .into_iter()
             .map(|p| {
                 p.strip_prefix(dir.path())
@@ -497,6 +549,48 @@ mod tests {
             })
             .collect();
         assert_eq!(found, ["a/b/c/deep.mkv", "a/one.mp4", "top.mkv"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn says_which_folders_it_could_not_read() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let locked = dir.path().join("Locked");
+        std::fs::create_dir_all(&locked).unwrap();
+        std::fs::write(locked.join("inside.mkv"), []).unwrap();
+        std::fs::write(dir.path().join("tidy.mkv"), []).unwrap();
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        // Someone who can read anything (root) has nothing to report.
+        let readable = std::fs::read_dir(&locked).is_ok();
+        let videos = video_files(dir.path(), &AtomicBool::new(false));
+        std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+        if readable {
+            return;
+        }
+        assert_eq!(videos.files, [dir.path().join("tidy.mkv")]);
+        assert_eq!(
+            videos.unread,
+            [Unread {
+                path: locked,
+                folder: true
+            }]
+        );
+    }
+
+    #[test]
+    fn audio_names_lead_with_the_layout() {
+        let mono = Stream {
+            channels: Some(1),
+            ..stream(1, StreamKind::Audio, "aac", "")
+        };
+        assert_eq!(standard_name(&mono).as_deref(), Some("Mono AAC"));
+        // A standard name always describes its own stream.
+        let named = Stream {
+            title: standard_name(&audio("")),
+            ..audio("")
+        };
+        assert!(review(&file(vec![named], None)).is_empty());
     }
 }
 

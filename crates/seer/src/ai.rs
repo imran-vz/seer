@@ -5,6 +5,7 @@
 //! Only text is sent: the file name and a few facts read from the file. The
 //! media itself never leaves the Mac. Calls block, so run them off the main thread.
 
+use crate::platform;
 use anyhow::{Context, Result, anyhow, bail};
 use security_framework::passwords::{get_generic_password, set_generic_password};
 use seer_core::naming::{self, Identity};
@@ -99,7 +100,7 @@ impl Provider {
             self.keychain_account(),
             key.trim().as_bytes(),
         )
-        .context("could not save the key to the Keychain")
+        .with_context(|| format!("could not save the key to the {}", platform::key_store()))
     }
 }
 

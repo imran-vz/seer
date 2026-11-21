@@ -1,5 +1,8 @@
-//! The parts of macOS that GPUI does not reach: system colours and Finder's
-//! file icons. Everything here must be called on the main thread.
+//! The parts of macOS that GPUI does not reach: system colours, Finder's
+//! file icons, the app's appearance, the traffic lights and ejecting a
+//! disk. Everything here except [`eject`] must be called on the main
+//! thread. Views do not call this directly for
+//! anything that differs per OS; that goes through `platform`.
 
 use block2::RcBlock;
 use gpui_kit::{Hsla, RenderImage, Rgba};
@@ -71,9 +74,21 @@ fn srgb(color: &NSColor) -> Option<Hsla> {
 }
 
 /// Finder's icon for a file or folder, rendered at `pixels` square.
-pub fn file_icon(path: &Path, pixels: usize) -> Option<Arc<RenderImage>> {
-    let icon =
-        NSWorkspace::sharedWorkspace().iconForFile(&NSString::from_str(&path.to_string_lossy()));
+pub fn file_icon(path: &Path, is_dir: bool, pixels: usize) -> Option<Arc<RenderImage>> {
+    let workspace = NSWorkspace::sharedWorkspace();
+    let icon = if seer_core::mtp::is_device_path(path) {
+        // Nothing on disk to ask about, so go by the type alone. "'fldr'"
+        // is the system's code for a plain folder.
+        let kind = match (is_dir, path.extension()) {
+            (true, _) => "'fldr'".to_owned(),
+            (false, Some(extension)) => extension.to_string_lossy().into_owned(),
+            (false, None) => String::new(),
+        };
+        #[allow(deprecated)]
+        workspace.iconForFileType(&NSString::from_str(&kind))
+    } else {
+        workspace.iconForFile(&NSString::from_str(&path.to_string_lossy()))
+    };
 
     let space = CGColorSpace::new_device_rgb()?;
     // BGRA in memory, which is what GPUI's renderer takes.
@@ -146,7 +161,7 @@ pub fn icon_for(path: &Path, is_dir: bool, points: usize) -> Option<Arc<RenderIm
     ICONS.with_borrow_mut(|icons| {
         icons
             .entry((key, points))
-            .or_insert_with(|| file_icon(path, points * 2))
+            .or_insert_with(|| file_icon(path, is_dir, points * 2))
             .clone()
     })
 }
@@ -164,4 +179,37 @@ pub fn set_appearance(dark: Option<bool>) {
         })
     });
     objc2_app_kit::NSApplication::sharedApplication(mtm).setAppearance(appearance.as_deref());
+}
+
+/// Hides the traffic lights of every window, so `ui::window_controls` can
+/// stand in for another OS's controls (`SEER_PLATFORM`). Best effort: GPUI
+/// may show them again if it re-creates the titlebar.
+pub fn hide_window_buttons() {
+    use objc2_app_kit::NSWindowButton;
+    let Some(mtm) = objc2::MainThreadMarker::new() else {
+        return;
+    };
+    for window in objc2_app_kit::NSApplication::sharedApplication(mtm).windows() {
+        for kind in [
+            NSWindowButton::CloseButton,
+            NSWindowButton::MiniaturizeButton,
+            NSWindowButton::ZoomButton,
+        ] {
+            if let Some(button) = window.standardWindowButton(kind) {
+                button.setHidden(true);
+            }
+        }
+    }
+}
+
+/// Unmounts and ejects the disk mounted at `path`. Blocks until the system
+/// is done, so call it off the main thread (the one exception to this
+/// module's main-thread rule: NSWorkspace may be used from any thread).
+/// False when the disk is busy or refuses.
+pub fn eject(path: &Path) -> bool {
+    use objc2_foundation::NSURL;
+    let url = NSURL::fileURLWithPath(&NSString::from_str(&path.to_string_lossy()));
+    NSWorkspace::sharedWorkspace()
+        .unmountAndEjectDeviceAtURL_error(&url)
+        .is_ok()
 }

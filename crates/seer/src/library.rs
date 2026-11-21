@@ -124,7 +124,9 @@ impl Library {
     /// Replaces any scan already running.
     pub fn scan(&mut self, entries: &[Entry], cx: &mut Context<Self>) {
         let mut wanted = Vec::new();
-        for entry in entries.iter().filter(|e| e.kind.is_probeable()) {
+        // Files on a device would have to be downloaded to be read.
+        let local = |e: &&Entry| e.kind.is_probeable() && !seer_core::mtp::is_device_path(&e.path);
+        for entry in entries.iter().filter(local) {
             let stamp = (entry.size, entry.modified);
             match self.probes.get(&entry.path) {
                 Some((known, Probe::Ready(_) | Probe::Unreadable)) if *known == stamp => {}

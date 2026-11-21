@@ -1,4 +1,5 @@
-//! Seer's engine: file listing, media probing, bitrate analysis and caching.
+//! Seer's engine: file listing, media probing, bitrate analysis, caching, and
+//! Android devices over USB.
 //!
 //! Nothing here knows about the UI. Every function is synchronous and safe to
 //! call from a background thread.
@@ -8,11 +9,13 @@ pub mod cache;
 pub mod fingerprint;
 pub mod format;
 pub mod fs;
+pub mod mtp;
 pub mod naming;
 pub mod probe;
 pub mod recommend;
 pub mod remux;
 pub mod titles;
+pub mod transfer;
 
 /// Must be called once before any probing.
 pub fn init() -> anyhow::Result<()> {

@@ -68,6 +68,8 @@ API key, which is stored in the Keychain. Only text is sent, never the media.
 | ⇧⌘N | New folder |
 | ⌘R | Reveal in Finder |
 | ⌘⌫ | Move to Trash |
+| ⌘C / ⌘V | Copy / paste items |
+| ⌥⌘V | Move copied items here |
 | ⌘A / Esc | Select all / deselect all |
 
 ### Media

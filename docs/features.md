@@ -18,6 +18,18 @@
 - New folder
 - Reveal in Finder
 - Move to Trash
+- Copy (⌘C), Paste (⌘V) and Move Item Here (⌥⌘V) between folders, with progress and cancel in the status bar
+- Drag rows onto a folder in the list or a place in the sidebar: a move within one disk or device, a copy across (as in Finder)
+- Drop files from Finder onto the list or a sidebar place to copy them there
+- Click the transfer in the status bar to see the file in hand, its own progress and the file count
+- Right-click a file, the empty space in a folder, or a sidebar place for the commands that apply there
+
+**Android Devices**
+- A phone or tablet connected by USB in File Transfer mode appears in the sidebar under Devices
+- Browse its storage like any folder; create folders, rename and delete on the device
+- Copy or move files and folders in both directions, and between folders on the device
+- Nothing is overwritten: an item whose name is taken arrives as "name 2"
+- Talks MTP directly over USB in pure Rust; no Android File Transfer, drivers or helper apps
 
 ### Media Analysis
 

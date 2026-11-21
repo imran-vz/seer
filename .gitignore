@@ -35,6 +35,8 @@ actions-runner/
 !README.md
 !ROADMAP.md
 !DESIGN.md
+!AGENTS.md
+!CLAUDE.md
 
 # Rust workspace
 /target
